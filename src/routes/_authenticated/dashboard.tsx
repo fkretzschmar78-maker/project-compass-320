@@ -1,10 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/use-role";
 import { syncMyRole } from "@/lib/roles.functions";
 import { clearConversationLog } from "@/lib/conversation-log.functions";
@@ -43,8 +41,6 @@ function Dashboard() {
   const { data, isLoading, refetch } = useRole();
   const sync = useServerFn(syncMyRole);
   const clearLog = useServerFn(clearConversationLog);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   // Falls die Whitelist erst nach der Registrierung gepflegt wurde,
   // wird die Rolle hier einmalig nachgezogen.
@@ -56,13 +52,6 @@ function Dashboard() {
       void sync().then(() => refetch());
     }
   }, [isLoading, data, sync, refetch]);
-
-  async function handleSignOut() {
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
-  }
 
   async function handleClearLog() {
     if (!window.confirm("Gesamten Gesprächsverlauf unwiderruflich löschen?")) {
@@ -78,7 +67,7 @@ function Dashboard() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-app-background px-4 py-16">
+    <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-app-text">Übersicht</CardTitle>
@@ -103,9 +92,6 @@ function Dashboard() {
             Die Rolle wird anhand der hinterlegten E-Mail-Adresse vergeben und kann
             nicht selbst gewählt werden.
           </p>
-          <Button variant="outline" className="w-full" onClick={handleSignOut}>
-            Abmelden
-          </Button>
           {(data?.role === "arzt" || data?.role === "patient") && (
             <Button
               variant="destructive"

@@ -167,7 +167,7 @@ function TranscribePage() {
 
   if (roleLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16">
+      <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
         <p className="text-muted-foreground">Rolle wird geladen …</p>
       </main>
     );
@@ -175,7 +175,7 @@ function TranscribePage() {
 
   if (role === "spectator" || !role) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16">
+      <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Spracherkennung nicht verfügbar</CardTitle>
@@ -541,7 +541,7 @@ function TranscribePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-app-background px-4 py-16">
+    <main className="flex min-h-full flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="text-app-text">Live-Spracherkennung</CardTitle>
