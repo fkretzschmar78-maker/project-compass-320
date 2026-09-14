@@ -167,7 +167,7 @@ function TranscribePage() {
 
   if (roleLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16">
+      <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
         <p className="text-muted-foreground">Rolle wird geladen …</p>
       </main>
     );
