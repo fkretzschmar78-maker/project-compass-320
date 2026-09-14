@@ -69,6 +69,13 @@ interface LiveSegment {
   translatedText: string;
 }
 
+interface ReleasedAkte {
+  anamnese: string;
+  befund: string;
+  beurteilung: string;
+  prozedere: string;
+}
+
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
@@ -81,6 +88,7 @@ function TranscribePage() {
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
   const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
+  const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -183,6 +191,22 @@ function TranscribePage() {
           }
         },
       )
+      .on(
+        "broadcast",
+        { event: "akte-freigegeben" },
+        (message: { payload?: ReleasedAkte }) => {
+          const payload = message.payload;
+          if (
+            payload &&
+            typeof payload.anamnese === "string" &&
+            typeof payload.befund === "string" &&
+            typeof payload.beurteilung === "string" &&
+            typeof payload.prozedere === "string"
+          ) {
+            setReleasedAkte(payload);
+          }
+        },
+      )
       .subscribe();
 
     channelRef.current = channel;
@@ -235,6 +259,25 @@ function TranscribePage() {
               Rolle:{" "}
               <span className="font-medium">{ROLE_LABEL[role]}</span>
             </p>
+
+            {releasedAkte && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-app-text">
+                    Freigegebene Aktennotiz
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <AkteSection title="Anamnese" text={releasedAkte.anamnese} />
+                  <AkteSection title="Befund" text={releasedAkte.befund} />
+                  <AkteSection
+                    title="Beurteilung"
+                    text={releasedAkte.beurteilung}
+                  />
+                  <AkteSection title="Prozedere" text={releasedAkte.prozedere} />
+                </CardContent>
+              </Card>
+            )}
 
             <div className="rounded-md border bg-muted/40 p-4">
               <p className="mb-2 text-sm font-medium text-app-text">
@@ -763,4 +806,13 @@ interface BroadcastSpeechPayload {
   segmentId: string;
   originalText: string;
   translatedText: string;
+}
+
+function AkteSection({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold text-app-text">{title}</h2>
+      <p className="leading-relaxed text-app-text">{text}</p>
+    </div>
+  );
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { generateAkte } from "@/lib/akte.functions";
@@ -8,6 +8,10 @@ import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+
+const LIVE_CHANNEL = "medifluent-live";
 
 const ROLE_LABEL: Record<string, string> = {
   arzt: "Arzt",
@@ -55,6 +59,7 @@ function AktePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
   const generate = useServerFn(generateAkte);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +67,19 @@ function AktePage() {
   const [verlauf, setVerlauf] = useState<LogEntry[] | null>(null);
   const [approved, setApproved] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
+
+  useEffect(() => {
+    const channel = supabase.channel(LIVE_CHANNEL, {
+      config: { broadcast: { self: false } },
+    });
+    channel.subscribe();
+    channelRef.current = channel;
+
+    return () => {
+      void channel.unsubscribe();
+      channelRef.current = null;
+    };
+  }, []);
 
   async function handleGenerate() {
     setLoading(true);
@@ -85,6 +103,19 @@ function AktePage() {
 
   function handleApprove() {
     setApproved(true);
+    const channel = channelRef.current;
+    if (channel && akte) {
+      void channel.send({
+        type: "broadcast",
+        event: "akte-freigegeben",
+        payload: {
+          anamnese: akte.anamnese,
+          befund: akte.befund,
+          beurteilung: akte.beurteilung,
+          prozedere: akte.prozedere,
+        },
+      });
+    }
     toast.success("Akte freigegeben");
   }
 
