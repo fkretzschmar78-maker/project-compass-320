@@ -10,12 +10,12 @@ const ROLE_LANGUAGE: Record<Exclude<AppRole, "spectator">, string> = {
 };
 
 /**
- * Stellt ein kurzlebiges Deepgram-Temporary-Token aus.
+ * Liefert den Deepgram-Browser-Key fuer die direkte WebSocket-Verbindung.
  * Nur fuer Rollen 'arzt' und 'patient' — Spectators hoeren nur zu
  * und brauchen kein eigenes Mikrofon bzw. Deepgram-Token.
- * Der echte Deepgram-API-Key bleibt serverseitig (process.env),
- * der Client erhaelt nur das kurzlebige Token und verbindet sich
- * anschliessend direkt mit wss://api.deepgram.com/v1/listen.
+ * Der Browser-Key bleibt serverseitig in process.env und wird nie
+ * im Client hartkodiert; er wird nur an authentifizierte 'arzt'/'patient'
+ * ausgeliefert.
  */
 export const getDeepgramToken = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -33,37 +33,13 @@ export const getDeepgramToken = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Rolle 'arzt' oder 'patient' erforderlich");
     }
 
-    const apiKey = process.env["DEEPGRAM_API_KEY"];
-    if (!apiKey) {
-      throw new Error("Deepgram API-Key ist nicht konfiguriert");
-    }
-
-    const response = await fetch("https://api.deepgram.com/v1/auth/grant", {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ttl_seconds: 60 }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      console.error("Deepgram token request failed:", {
-        status: response.status,
-        statusText: response.statusText,
-        body,
-      });
-      throw new Error("Deepgram-Token konnte nicht erstellt werden");
-    }
-
-    const grant = (await response.json()) as { access_token?: string };
-    if (!grant.access_token) {
-      throw new Error("Deepgram hat kein Token zurueckgegeben");
+    const browserKey = process.env["DEEPGRAM_BROWSER_KEY"];
+    if (!browserKey) {
+      throw new Error("Deepgram Browser-Key ist nicht konfiguriert");
     }
 
     return {
-      token: grant.access_token,
+      token: browserKey,
       model: "nova-3" as const,
       language: ROLE_LANGUAGE[role],
       listenUrl: "wss://api.deepgram.com/v1/listen",
