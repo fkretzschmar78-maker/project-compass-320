@@ -541,20 +541,21 @@ function TranscribePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-16">
+    <main className="flex min-h-screen flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Live-Spracherkennung</CardTitle>
+          <CardTitle className="text-app-text">Live-Spracherkennung</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-app-text">
             Rolle:{" "}
-            <span className="font-medium text-foreground">
+            <span className="font-medium">
               {ROLE_LABEL[role]}
             </span>
           </p>
+
           <div className="rounded-md border bg-muted/40 p-3">
-            <p className="text-sm font-medium">
+            <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
             </p>
             {receivedSegments.length > 0 && (
@@ -562,7 +563,7 @@ function TranscribePage() {
                 {receivedSegments.map((id) => (
                   <li
                     key={id}
-                    className="truncate text-xs font-mono text-muted-foreground"
+                    className="truncate text-[13px] font-mono text-muted-foreground"
                     title={id}
                   >
                     {id}
@@ -571,11 +572,17 @@ function TranscribePage() {
               </ul>
             )}
             {receivedSegments.length === 0 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 Noch keine empfangen.
               </p>
             )}
           </div>
+          {isRecording && (
+            <div className="flex items-center justify-center gap-2 text-sm text-app-text">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-translation-accent motion-safe:animate-pulse" />
+              Aufnahme läuft
+            </div>
+          )}
           <div className="flex justify-center">
             <Button
               onClick={isRecording ? stop : start}
@@ -584,58 +591,61 @@ function TranscribePage() {
               {isRecording ? "Aufnahme stoppen" : "Aufnahme starten"}
             </Button>
           </div>
+
           {error && (
             <p className="text-center text-sm text-destructive">{error}</p>
           )}
           <div className="rounded-md border bg-muted/40 p-4">
-            <p className="mb-2 text-sm font-medium">Transkript</p>
-            <div className="space-y-1">
+            <p className="mb-2 text-sm font-medium text-app-text">Transkript</p>
+            <div className="space-y-6">
               {transcripts.map((t, i) => (
-                <div key={t.id ?? i} className="space-y-1">
-                  <span
+                <div key={t.id ?? i} className="space-y-2">
+                  <p
                     className={
-                      t.isFinal ? "text-foreground" : "text-muted-foreground"
+                      t.isFinal
+                        ? "text-xl font-medium text-app-text"
+                        : "text-xl font-medium text-muted-foreground"
                     }
                   >
-                    {t.text + " "}
-                  </span>
+                    {t.text}
+                  </p>
                   {t.translating && (
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-[13px] text-muted-foreground">
                       Übersetzung läuft …
                     </span>
                   )}
                   {t.translationError && (
-                    <span className="block text-xs text-destructive">
+                    <span className="block text-[13px] text-destructive">
                       {t.translationError}
                     </span>
                   )}
                   {t.translation && (
-                    <span className="block text-sm italic text-muted-foreground">
+                    <p className="border-l-4 border-translation-accent pl-3 text-lg text-translation-accent">
                       {t.translation}
-                    </span>
+                    </p>
                   )}
                   {t.backTranslating && (
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-[13px] text-muted-foreground">
                       Rückübersetzung läuft …
                     </span>
                   )}
                   {t.backTranslationError && (
-                    <span className="block text-xs text-destructive">
+                    <span className="block text-[13px] text-destructive">
                       {t.backTranslationError}
                     </span>
                   )}
                   {t.backTranslation && (
-                    <span className="block text-xs text-muted-foreground">
+                    <p className="border-l-4 border-control-accent pl-3 text-base text-control-accent">
                       Rückübersetzung zur Kontrolle: {t.backTranslation}
-                    </span>
+                    </p>
                   )}
                   {t.synthesizing && (
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-[13px] text-muted-foreground">
                       Sprachausgabe wird erstellt …
                     </span>
                   )}
                   {t.synthesisError && (
-                    <span className="block text-xs text-destructive">
+                    <span className="block text-[13px] text-destructive">
                       {t.synthesisError}
                     </span>
                   )}
@@ -648,6 +658,7 @@ function TranscribePage() {
               )}
             </div>
           </div>
+
           <Button asChild variant="outline" className="w-full">
             <Link to="/dashboard">Zurück zur Übersicht</Link>
           </Button>
