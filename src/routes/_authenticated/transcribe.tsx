@@ -191,6 +191,22 @@ function TranscribePage() {
           }
         },
       )
+      .on(
+        "broadcast",
+        { event: "akte-freigegeben" },
+        (message: { payload?: ReleasedAkte }) => {
+          const payload = message.payload;
+          if (
+            payload &&
+            typeof payload.anamnese === "string" &&
+            typeof payload.befund === "string" &&
+            typeof payload.beurteilung === "string" &&
+            typeof payload.prozedere === "string"
+          ) {
+            setReleasedAkte(payload);
+          }
+        },
+      )
       .subscribe();
 
     channelRef.current = channel;
