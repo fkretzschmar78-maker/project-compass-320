@@ -807,3 +807,12 @@ interface BroadcastSpeechPayload {
   originalText: string;
   translatedText: string;
 }
+
+function AkteSection({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold text-app-text">{title}</h2>
+      <p className="leading-relaxed text-app-text">{text}</p>
+    </div>
+  );
+}
