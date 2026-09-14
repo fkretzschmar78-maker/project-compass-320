@@ -62,6 +62,13 @@ interface TranscriptItem {
   synthesisError?: string;
 }
 
+interface LiveSegment {
+  id: string;
+  fromRole: "arzt" | "patient";
+  originalText: string;
+  translatedText: string;
+}
+
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
@@ -73,6 +80,7 @@ function TranscribePage() {
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
+  const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
