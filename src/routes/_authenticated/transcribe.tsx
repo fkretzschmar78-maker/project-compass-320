@@ -541,18 +541,19 @@ function TranscribePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-16">
+    <main className="flex min-h-screen flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Live-Spracherkennung</CardTitle>
+          <CardTitle className="text-app-text">Live-Spracherkennung</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-app-text">
             Rolle:{" "}
-            <span className="font-medium text-foreground">
+            <span className="font-medium">
               {ROLE_LABEL[role]}
             </span>
           </p>
+
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-sm font-medium">
               Empfangene Audiosegmente: {receivedSegments.length}
