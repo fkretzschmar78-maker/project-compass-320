@@ -69,6 +69,13 @@ interface LiveSegment {
   translatedText: string;
 }
 
+interface ReleasedAkte {
+  anamnese: string;
+  befund: string;
+  beurteilung: string;
+  prozedere: string;
+}
+
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
@@ -81,6 +88,7 @@ function TranscribePage() {
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
   const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
+  const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
