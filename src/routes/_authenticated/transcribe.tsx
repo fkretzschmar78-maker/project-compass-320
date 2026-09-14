@@ -37,8 +37,12 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 interface TranscriptItem {
+  id: string;
   text: string;
   isFinal: boolean;
+  translation?: string;
+  translating?: boolean;
+  translationError?: string;
 }
 
 function TranscribePage() {
