@@ -187,14 +187,26 @@ function TranscribePage() {
         throw new Error("Kein Deepgram-Token erhalten");
       }
 
+      // Verbindungsvarianten:
+      // A) access_token als Query-Parameter — funktioniert mit dem kurzlebigen
+      //    Temporary Token von /v1/auth/grant (derzeit aktiv).
+      // B) Token als Sec-WebSocket-Protocol — Deepgram-Doku für Client-seitige
+      //    Verbindungen. Zum Testen auf `true` setzen.
+      const useProtocolAuth = false;
+
       const wsUrl = new URL(listenUrl);
       wsUrl.searchParams.set("model", "nova-3");
       wsUrl.searchParams.set("language", language);
       wsUrl.searchParams.set("encoding", "linear16");
       wsUrl.searchParams.set("sample_rate", "16000");
-      wsUrl.searchParams.set("access_token", token);
+      if (!useProtocolAuth) {
+        wsUrl.searchParams.set("access_token", token);
+      }
 
-      const ws = new WebSocket(wsUrl.toString());
+      const ws = new WebSocket(
+        wsUrl.toString(),
+        useProtocolAuth ? ["token", token] : undefined,
+      );
       ws.binaryType = "arraybuffer";
       wsRef.current = ws;
 
