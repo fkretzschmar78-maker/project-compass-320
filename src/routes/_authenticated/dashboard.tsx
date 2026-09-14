@@ -2,10 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/use-role";
 import { syncMyRole } from "@/lib/roles.functions";
+import { clearConversationLog } from "@/lib/conversation-log.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { data, isLoading, refetch } = useRole();
   const sync = useServerFn(syncMyRole);
+  const clearLog = useServerFn(clearConversationLog);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -59,6 +62,19 @@ function Dashboard() {
     queryClient.clear();
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
+  }
+
+  async function handleClearLog() {
+    if (!window.confirm("Gesamten Gesprächsverlauf unwiderruflich löschen?")) {
+      return;
+    }
+    try {
+      await clearLog();
+      toast.success("Gesprächsverlauf gelöscht");
+    } catch (err) {
+      console.error("Fehler beim Löschen des Gesprächsverlaufs:", err);
+      toast.error("Löschen fehlgeschlagen");
+    }
   }
 
   return (
@@ -89,6 +105,16 @@ function Dashboard() {
           <Button variant="outline" className="w-full" onClick={handleSignOut}>
             Abmelden
           </Button>
+          {(data?.role === "arzt" || data?.role === "patient") && (
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={isLoading}
+              onClick={handleClearLog}
+            >
+              Gesprächsverlauf löschen
+            </Button>
+          )}
         </CardContent>
       </Card>
     </main>
