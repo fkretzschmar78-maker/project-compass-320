@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 
 import { getDeepgramToken } from "@/lib/deepgram.functions";
+import { translateText } from "@/lib/translate.functions";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,13 +37,18 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 interface TranscriptItem {
+  id: string;
   text: string;
   isFinal: boolean;
+  translation?: string;
+  translating?: boolean;
+  translationError?: string;
 }
 
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
+  const fetchTranslate = useServerFn(translateText);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,18 +223,60 @@ function TranscribePage() {
         if (msg.type === "Results") {
           const transcript = msg.channel?.alternatives?.[0]?.transcript ?? "";
           if (!transcript) return;
+          if (msg.is_final) {
+            const id = crypto.randomUUID();
+            setTranscripts((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && !last.isFinal) {
+                return [
+                  ...prev.slice(0, -1),
+                  { id, text: transcript, isFinal: true, translating: true },
+                ];
+              }
+              return [
+                ...prev,
+                { id, text: transcript, isFinal: true, translating: true },
+              ];
+            });
+            fetchTranslate({ data: { text: transcript } })
+              .then((result) => {
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translation: result.translation,
+                          translating: false,
+                        }
+                      : item
+                  )
+                );
+              })
+              .catch((err) => {
+                console.error("Übersetzung fehlgeschlagen:", err);
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translationError: "Übersetzung fehlgeschlagen",
+                          translating: false,
+                        }
+                      : item
+                  )
+                );
+              });
+            return;
+          }
           setTranscripts((prev) => {
             const last = prev[prev.length - 1];
             if (last && !last.isFinal) {
-              return [
-                ...prev.slice(0, -1),
-                { text: transcript, isFinal: msg.is_final ?? false },
-              ];
+              return [...prev.slice(0, -1), { ...last, text: transcript }];
             }
-            if (msg.is_final) {
-              return [...prev, { text: transcript, isFinal: true }];
-            }
-            return [...prev, { text: transcript, isFinal: false }];
+            return [
+              ...prev,
+              { id: crypto.randomUUID(), text: transcript, isFinal: false },
+            ];
           });
         }
       };
@@ -336,14 +385,30 @@ function TranscribePage() {
             <p className="mb-2 text-sm font-medium">Transkript</p>
             <div className="space-y-1">
               {transcripts.map((t, i) => (
-                <span
-                  key={i}
-                  className={
-                    t.isFinal ? "text-foreground" : "text-muted-foreground"
-                  }
-                >
-                  {t.text + " "}
-                </span>
+                <div key={t.id ?? i} className="space-y-1">
+                  <span
+                    className={
+                      t.isFinal ? "text-foreground" : "text-muted-foreground"
+                    }
+                  >
+                    {t.text + " "}
+                  </span>
+                  {t.translating && (
+                    <span className="block text-xs text-muted-foreground">
+                      Übersetzung läuft …
+                    </span>
+                  )}
+                  {t.translationError && (
+                    <span className="block text-xs text-destructive">
+                      {t.translationError}
+                    </span>
+                  )}
+                  {t.translation && (
+                    <span className="block text-sm italic text-muted-foreground">
+                      {t.translation}
+                    </span>
+                  )}
+                </div>
               ))}
               {transcripts.length === 0 && !isRecording && (
                 <p className="text-sm text-muted-foreground">
