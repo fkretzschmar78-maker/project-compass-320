@@ -600,6 +600,21 @@ function TranscribePage() {
                       {t.translation}
                     </span>
                   )}
+                  {t.backTranslating && (
+                    <span className="block text-xs text-muted-foreground">
+                      Rückübersetzung läuft …
+                    </span>
+                  )}
+                  {t.backTranslationError && (
+                    <span className="block text-xs text-destructive">
+                      {t.backTranslationError}
+                    </span>
+                  )}
+                  {t.backTranslation && (
+                    <span className="block text-xs text-muted-foreground">
+                      Rückübersetzung zur Kontrolle: {t.backTranslation}
+                    </span>
+                  )}
                   {t.synthesizing && (
                     <span className="block text-xs text-muted-foreground">
                       Sprachausgabe wird erstellt …
