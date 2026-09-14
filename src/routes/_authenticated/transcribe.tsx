@@ -67,6 +67,7 @@ function TranscribePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
+  const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -143,6 +144,8 @@ function TranscribePage() {
             payload.clips.length > 0 &&
             payload.fromRole === OTHER_ROLE[role]
           ) {
+            const segmentId = payload.segmentId || "unknown";
+            setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
             enqueueClips(payload.clips);
           }
         },
@@ -503,6 +506,29 @@ function TranscribePage() {
               {ROLE_LABEL[role]}
             </span>
           </p>
+          <div className="rounded-md border bg-muted/40 p-3">
+            <p className="text-sm font-medium">
+              Empfangene Audiosegmente: {receivedSegments.length}
+            </p>
+            {receivedSegments.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {receivedSegments.map((id) => (
+                  <li
+                    key={id}
+                    className="truncate text-xs font-mono text-muted-foreground"
+                    title={id}
+                  >
+                    {id}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {receivedSegments.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Noch keine empfangen.
+              </p>
+            )}
+          </div>
           <div className="flex justify-center">
             <Button
               onClick={isRecording ? stop : start}
