@@ -62,6 +62,13 @@ interface TranscriptItem {
   synthesisError?: string;
 }
 
+interface LiveSegment {
+  id: string;
+  fromRole: "arzt" | "patient";
+  originalText: string;
+  translatedText: string;
+}
+
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
@@ -73,6 +80,7 @@ function TranscribePage() {
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
+  const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -131,7 +139,7 @@ function TranscribePage() {
   }, []);
 
   useEffect(() => {
-    if (!role || role === "spectator") return;
+    if (!role) return;
 
     const channel = supabase.channel(LIVE_CHANNEL, {
       config: { broadcast: { self: false } },
@@ -143,9 +151,29 @@ function TranscribePage() {
         { event: "speech" },
         (message: { payload?: BroadcastSpeechPayload }) => {
           const payload = message.payload;
+          if (!payload || !Array.isArray(payload.clips)) return;
+
+          if (role === "spectator") {
+            if (payload.clips.length > 0) {
+              const segmentId = payload.segmentId || "unknown";
+              setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
+              enqueueClips(payload.clips);
+            }
+            if (payload.originalText && payload.translatedText) {
+              setLiveSegments((prev) => [
+                ...prev,
+                {
+                  id: payload.segmentId || crypto.randomUUID(),
+                  fromRole: payload.fromRole,
+                  originalText: payload.originalText,
+                  translatedText: payload.translatedText,
+                },
+              ]);
+            }
+            return;
+          }
+
           if (
-            payload &&
-            Array.isArray(payload.clips) &&
             payload.clips.length > 0 &&
             payload.fromRole === OTHER_ROLE[role]
           ) {
@@ -173,7 +201,7 @@ function TranscribePage() {
     );
   }
 
-  if (role === "spectator" || !role) {
+  if (!role) {
     return (
       <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
         <Card className="w-full max-w-md">
@@ -184,11 +212,56 @@ function TranscribePage() {
             <p className="text-muted-foreground">
               Die Live-Spracherkennung steht nur Ärzten und Patienten zur
               Verfügung. Ihre aktuelle Rolle:{" "}
-              <span className="font-medium text-foreground">
-                {role ? ROLE_LABEL[role] : "unbekannt"}
-              </span>
-              .
+              <span className="font-medium text-foreground">unbekannt</span>.
             </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/dashboard">Zurück zur Übersicht</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (role === "spectator") {
+    return (
+      <main className="flex min-h-full flex-col items-center bg-app-background px-4 py-16">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-app-text">Live-Mitschrift</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-sm text-app-text">
+              Rolle:{" "}
+              <span className="font-medium">{ROLE_LABEL[role]}</span>
+            </p>
+
+            <div className="rounded-md border bg-muted/40 p-4">
+              <p className="mb-2 text-sm font-medium text-app-text">
+                Empfangene Segmente
+              </p>
+              <div className="space-y-6">
+                {liveSegments.map((seg, i) => (
+                  <div key={seg.id ?? i} className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {ROLE_LABEL[seg.fromRole]}
+                    </p>
+                    <p className="text-xl font-medium text-app-text">
+                      {seg.originalText}
+                    </p>
+                    <p className="border-l-4 border-translation-accent pl-3 text-lg text-translation-accent">
+                      {seg.translatedText}
+                    </p>
+                  </div>
+                ))}
+                {liveSegments.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Noch keine Segmente empfangen.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <Button asChild variant="outline" className="w-full">
               <Link to="/dashboard">Zurück zur Übersicht</Link>
             </Button>
@@ -387,6 +460,8 @@ function TranscribePage() {
                               clips: synthResult.clips,
                               fromRole: role,
                               segmentId: id,
+                              originalText: transcript,
+                              translatedText: result.translation,
                             } as BroadcastSpeechPayload,
                           });
                         }
@@ -686,4 +761,6 @@ interface BroadcastSpeechPayload {
   clips: string[];
   fromRole: "arzt" | "patient";
   segmentId: string;
+  originalText: string;
+  translatedText: string;
 }
