@@ -53,6 +53,9 @@ interface TranscriptItem {
   translation?: string;
   translating?: boolean;
   translationError?: string;
+  backTranslation?: string;
+  backTranslating?: boolean;
+  backTranslationError?: string;
   audioClips?: string[];
   synthesizing?: boolean;
   synthesisError?: string;
