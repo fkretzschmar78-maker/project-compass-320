@@ -48,7 +48,13 @@ export const getDeepgramToken = createServerFn({ method: "POST" })
     });
 
     if (!response.ok) {
-      throw new Error(`Deepgram-Tokenanforderung fehlgeschlagen (${response.status})`);
+      const body = await response.text();
+      console.error("Deepgram token request failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        body,
+      });
+      throw new Error("Deepgram-Token konnte nicht erstellt werden");
     }
 
     const grant = (await response.json()) as { access_token?: string };
