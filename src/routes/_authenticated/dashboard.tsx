@@ -78,11 +78,12 @@ function Dashboard() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16">
+    <main className="flex min-h-screen items-center justify-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Übersicht</CardTitle>
+          <CardTitle className="text-app-text">Übersicht</CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-6">
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Angemeldet als</p>
