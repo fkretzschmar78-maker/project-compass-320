@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getDeepgramToken } from "@/lib/deepgram.functions";
 import { translateText } from "@/lib/translate.functions";
+import { synthesizeSpeech } from "@/lib/tts.functions";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,12 +44,16 @@ interface TranscriptItem {
   translation?: string;
   translating?: boolean;
   translationError?: string;
+  audioClips?: string[];
+  synthesizing?: boolean;
+  synthesisError?: string;
 }
 
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
   const fetchTranslate = useServerFn(translateText);
+  const fetchSynthesize = useServerFn(synthesizeSpeech);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +63,50 @@ function TranscribePage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioQueueRef = useRef<string[][]>([]);
+  const isPlayingRef = useRef(false);
+
+  function enqueueClips(clips: string[]) {
+    audioQueueRef.current.push(clips);
+    void processQueue();
+  }
+
+  async function processQueue() {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    isPlayingRef.current = true;
+    const clips = audioQueueRef.current.shift()!;
+    await playClipArray(clips);
+    isPlayingRef.current = false;
+    void processQueue();
+  }
+
+  function playClipArray(clips: string[]): Promise<void> {
+    return new Promise((resolve) => {
+      let index = 0;
+      const playNext = () => {
+        if (index >= clips.length) {
+          resolve();
+          return;
+        }
+        const audio = new Audio(`data:audio/mp3;base64,${clips[index]}`);
+        audio.onended = () => {
+          index++;
+          playNext();
+        };
+        audio.onerror = () => {
+          console.error("Audio-Wiedergabe-Fehler");
+          index++;
+          playNext();
+        };
+        audio.play().catch((err) => {
+          console.error("Audio.play() abgelehnt:", err);
+          index++;
+          playNext();
+        });
+      };
+      playNext();
+    });
+  }
 
   useEffect(() => {
     return () => {
@@ -247,10 +296,40 @@ function TranscribePage() {
                           ...item,
                           translation: result.translation,
                           translating: false,
+                          synthesizing: true,
                         }
                       : item
                   )
                 );
+                fetchSynthesize({ data: { text: result.translation } })
+                  .then((synthResult) => {
+                    setTranscripts((prev) =>
+                      prev.map((item) =>
+                        item.id === id
+                          ? {
+                              ...item,
+                              audioClips: synthResult.clips,
+                              synthesizing: false,
+                            }
+                          : item
+                      )
+                    );
+                    enqueueClips(synthResult.clips);
+                  })
+                  .catch((err) => {
+                    console.error("Sprachausgabe fehlgeschlagen:", err);
+                    setTranscripts((prev) =>
+                      prev.map((item) =>
+                        item.id === id
+                          ? {
+                              ...item,
+                              synthesisError: "Sprachausgabe fehlgeschlagen",
+                              synthesizing: false,
+                            }
+                          : item
+                      )
+                    );
+                  });
               })
               .catch((err) => {
                 console.error("Übersetzung fehlgeschlagen:", err);
@@ -406,6 +485,16 @@ function TranscribePage() {
                   {t.translation && (
                     <span className="block text-sm italic text-muted-foreground">
                       {t.translation}
+                    </span>
+                  )}
+                  {t.synthesizing && (
+                    <span className="block text-xs text-muted-foreground">
+                      Sprachausgabe wird erstellt …
+                    </span>
+                  )}
+                  {t.synthesisError && (
+                    <span className="block text-xs text-destructive">
+                      {t.synthesisError}
                     </span>
                   )}
                 </div>
