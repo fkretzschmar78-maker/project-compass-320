@@ -8,6 +8,8 @@ import { synthesizeSpeech } from "@/lib/tts.functions";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/_authenticated/transcribe")({
   head: () => ({
@@ -35,6 +37,13 @@ const ROLE_LABEL: Record<string, string> = {
   arzt: "Arzt",
   patient: "Patient",
   spectator: "Zuhörer",
+};
+
+const LIVE_CHANNEL = "medifluent-live";
+
+const OTHER_ROLE: Record<string, "arzt" | "patient"> = {
+  arzt: "patient",
+  patient: "arzt",
 };
 
 interface TranscriptItem {
@@ -65,6 +74,7 @@ function TranscribePage() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<string[][]>([]);
   const isPlayingRef = useRef(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   function enqueueClips(clips: string[]) {
     audioQueueRef.current.push(clips);
@@ -113,6 +123,39 @@ function TranscribePage() {
       void stop();
     };
   }, []);
+
+  useEffect(() => {
+    if (!role || role === "spectator") return;
+
+    const channel = supabase.channel(LIVE_CHANNEL, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel
+      .on(
+        "broadcast",
+        { event: "speech" },
+        (message: { payload?: BroadcastSpeechPayload }) => {
+          const payload = message.payload;
+          if (
+            payload &&
+            Array.isArray(payload.clips) &&
+            payload.clips.length > 0 &&
+            payload.fromRole === OTHER_ROLE[role]
+          ) {
+            enqueueClips(payload.clips);
+          }
+        },
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      void channel.unsubscribe();
+      channelRef.current = null;
+    };
+  }, [role]);
 
   if (roleLoading) {
     return (
@@ -314,7 +357,18 @@ function TranscribePage() {
                           : item
                       )
                     );
-                    enqueueClips(synthResult.clips);
+                    const channel = channelRef.current;
+                    if (channel) {
+                      void channel.send({
+                        type: "broadcast",
+                        event: "speech",
+                        payload: {
+                          clips: synthResult.clips,
+                          fromRole: role,
+                          segmentId: id,
+                        } as BroadcastSpeechPayload,
+                      });
+                    }
                   })
                   .catch((err) => {
                     console.error("Sprachausgabe fehlgeschlagen:", err);
@@ -527,4 +581,10 @@ interface DeepgramMessage {
   type?: string;
   is_final?: boolean;
   channel?: DeepgramChannel;
+}
+
+interface BroadcastSpeechPayload {
+  clips: string[];
+  fromRole: "arzt" | "patient";
+  segmentId: string;
 }
