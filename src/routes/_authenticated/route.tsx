@@ -82,6 +82,17 @@ function AuthenticatedLayout() {
                   Live-Sprache
                 </Link>
               )}
+              {role === "arzt" && (
+                <Link
+                  to="/akte"
+                  className={cn(
+                    linkBase,
+                    location.pathname === "/akte" ? linkActive : linkInactive,
+                  )}
+                >
+                  Akte
+                </Link>
+              )}
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleSignOut}>
