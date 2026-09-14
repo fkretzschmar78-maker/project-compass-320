@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/use-role";
@@ -45,8 +45,11 @@ function Dashboard() {
 
   // Falls die Whitelist erst nach der Registrierung gepflegt wurde,
   // wird die Rolle hier einmalig nachgezogen.
+  const syncedRef = useRef(false);
   useEffect(() => {
+    if (syncedRef.current) return;
     if (!isLoading && data && data.role === "spectator") {
+      syncedRef.current = true;
       void sync().then(() => refetch());
     }
   }, [isLoading, data, sync, refetch]);
