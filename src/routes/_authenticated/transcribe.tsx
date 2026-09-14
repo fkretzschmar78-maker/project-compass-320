@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getDeepgramToken } from "@/lib/deepgram.functions";
 import { translateText } from "@/lib/translate.functions";
 import { synthesizeSpeech } from "@/lib/tts.functions";
+import { logConversationSegment } from "@/lib/conversation-log.functions";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,7 @@ function TranscribePage() {
   const role = roleData?.role;
   const fetchTranslate = useServerFn(translateText);
   const fetchSynthesize = useServerFn(synthesizeSpeech);
+  const fetchLogSegment = useServerFn(logConversationSegment);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -336,6 +338,11 @@ function TranscribePage() {
                 { id, text: transcript, isFinal: true, translating: true },
               ];
             });
+            if (role === "patient") {
+              void fetchLogSegment({ data: { text: transcript } }).catch((err) =>
+                console.error("Protokollierung fehlgeschlagen:", err),
+              );
+            }
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
                     setTranscripts((prev) =>
@@ -351,6 +358,13 @@ function TranscribePage() {
                           : item
                       )
                     );
+                    if (role === "arzt") {
+                      void fetchLogSegment({
+                        data: { text: result.translation },
+                      }).catch((err) =>
+                        console.error("Protokollierung fehlgeschlagen:", err),
+                      );
+                    }
                     fetchSynthesize({ data: { text: result.translation } })
                       .then((synthResult) => {
                         setTranscripts((prev) =>

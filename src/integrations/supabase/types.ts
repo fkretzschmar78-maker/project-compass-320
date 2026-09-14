@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_log: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          source: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          source: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          source?: string
+          text?: string
+        }
+        Relationships: []
+      }
       role_whitelist: {
         Row: {
           created_at: string
