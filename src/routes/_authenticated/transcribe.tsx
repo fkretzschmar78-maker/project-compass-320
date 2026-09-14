@@ -203,7 +203,9 @@ function TranscribePage() {
         workletNode.port.onmessage = (event) => {
           const int16 = event.data as Int16Array;
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(int16);
+            const buffer = new ArrayBuffer(int16.byteLength);
+            new Int16Array(buffer).set(int16);
+            ws.send(buffer);
           }
         };
       };
