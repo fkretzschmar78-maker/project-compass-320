@@ -385,14 +385,30 @@ function TranscribePage() {
             <p className="mb-2 text-sm font-medium">Transkript</p>
             <div className="space-y-1">
               {transcripts.map((t, i) => (
-                <span
-                  key={i}
-                  className={
-                    t.isFinal ? "text-foreground" : "text-muted-foreground"
-                  }
-                >
-                  {t.text + " "}
-                </span>
+                <div key={t.id ?? i} className="space-y-1">
+                  <span
+                    className={
+                      t.isFinal ? "text-foreground" : "text-muted-foreground"
+                    }
+                  >
+                    {t.text + " "}
+                  </span>
+                  {t.translating && (
+                    <span className="block text-xs text-muted-foreground">
+                      Übersetzung läuft …
+                    </span>
+                  )}
+                  {t.translationError && (
+                    <span className="block text-xs text-destructive">
+                      {t.translationError}
+                    </span>
+                  )}
+                  {t.translation && (
+                    <span className="block text-sm italic text-muted-foreground">
+                      {t.translation}
+                    </span>
+                  )}
+                </div>
               ))}
               {transcripts.length === 0 && !isRecording && (
                 <p className="text-sm text-muted-foreground">
