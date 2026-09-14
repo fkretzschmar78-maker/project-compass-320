@@ -48,6 +48,7 @@ interface TranscriptItem {
 function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
+  const fetchTranslate = useServerFn(translateText);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
