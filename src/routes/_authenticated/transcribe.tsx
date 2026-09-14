@@ -192,7 +192,7 @@ function TranscribePage() {
       //    Temporary Token von /v1/auth/grant (derzeit aktiv).
       // B) Token als Sec-WebSocket-Protocol — Deepgram-Doku für Client-seitige
       //    Verbindungen. Zum Testen auf `true` setzen.
-      const useProtocolAuth = false;
+      const useProtocolAuth = true;
 
       const wsUrl = new URL(listenUrl);
       wsUrl.searchParams.set("model", "nova-3");
