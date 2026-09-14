@@ -223,18 +223,60 @@ function TranscribePage() {
         if (msg.type === "Results") {
           const transcript = msg.channel?.alternatives?.[0]?.transcript ?? "";
           if (!transcript) return;
+          if (msg.is_final) {
+            const id = crypto.randomUUID();
+            setTranscripts((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && !last.isFinal) {
+                return [
+                  ...prev.slice(0, -1),
+                  { id, text: transcript, isFinal: true, translating: true },
+                ];
+              }
+              return [
+                ...prev,
+                { id, text: transcript, isFinal: true, translating: true },
+              ];
+            });
+            fetchTranslate({ data: { text: transcript } })
+              .then((result) => {
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translation: result.translation,
+                          translating: false,
+                        }
+                      : item
+                  )
+                );
+              })
+              .catch((err) => {
+                console.error("Übersetzung fehlgeschlagen:", err);
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translationError: "Übersetzung fehlgeschlagen",
+                          translating: false,
+                        }
+                      : item
+                  )
+                );
+              });
+            return;
+          }
           setTranscripts((prev) => {
             const last = prev[prev.length - 1];
             if (last && !last.isFinal) {
-              return [
-                ...prev.slice(0, -1),
-                { text: transcript, isFinal: msg.is_final ?? false },
-              ];
+              return [...prev.slice(0, -1), { ...last, text: transcript }];
             }
-            if (msg.is_final) {
-              return [...prev, { text: transcript, isFinal: true }];
-            }
-            return [...prev, { text: transcript, isFinal: false }];
+            return [
+              ...prev,
+              { id: crypto.randomUUID(), text: transcript, isFinal: false },
+            ];
           });
         }
       };
