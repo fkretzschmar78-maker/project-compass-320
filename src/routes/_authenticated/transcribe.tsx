@@ -238,8 +238,19 @@ function TranscribePage() {
         void stop();
       };
 
-      ws.onerror = () => fail("Verbindungsfehler zur Spracherkennung");
-      ws.onclose = () => fail("Verbindung zur Spracherkennung wurde unterbrochen");
+      ws.onerror = (event) => {
+        console.error("WebSocket-Fehler", event);
+        fail("Verbindungsfehler zur Spracherkennung");
+      };
+
+      ws.onclose = (event) => {
+        const code = event.code;
+        const reason = event.reason || "kein Grund angegeben";
+        console.error("WebSocket geschlossen", { code, reason });
+        fail(
+          `Verbindung zur Spracherkennung wurde unterbrochen (Code ${code}: ${reason})`,
+        );
+      };
     } catch (err) {
       setError(
         err instanceof Error
