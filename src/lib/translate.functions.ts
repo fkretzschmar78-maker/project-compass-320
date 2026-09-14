@@ -6,14 +6,21 @@ type AppRole = "arzt" | "patient" | "spectator";
 
 const TranslateInput = z.object({
   text: z.string().min(1),
+  direction: z.enum(["forward", "back"]).optional().default("forward"),
 });
 
-const ROLE_TARGET_LANGUAGE: Record<
+const ROLE_LANGUAGES: Record<
   Exclude<AppRole, "spectator">,
-  { code: string; label: string }
+  { forward: { code: string; label: string }; back: { code: string; label: string } }
 > = {
-  arzt: { code: "de", label: "Deutsche" },
-  patient: { code: "hi", label: "Hindi (Devanagari)" },
+  arzt: {
+    forward: { code: "de", label: "Deutsche" },
+    back: { code: "hi", label: "Hindi (Devanagari)" },
+  },
+  patient: {
+    forward: { code: "hi", label: "Hindi (Devanagari)" },
+    back: { code: "de", label: "Deutsche" },
+  },
 };
 
 const SYSTEM_PROMPT = [
@@ -42,7 +49,7 @@ export const translateText = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Rolle 'arzt' oder 'patient' erforderlich");
     }
 
-    const target = ROLE_TARGET_LANGUAGE[role];
+    const target = ROLE_LANGUAGES[role][data.direction];
     const apiKey = process.env["OPENAI_API_KEY"];
 
     if (!apiKey) {
