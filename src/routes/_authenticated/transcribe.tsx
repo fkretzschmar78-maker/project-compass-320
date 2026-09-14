@@ -541,7 +541,7 @@ function TranscribePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-app-background px-4 py-16">
+    <main className="flex min-h-full flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="text-app-text">Live-Spracherkennung</CardTitle>
