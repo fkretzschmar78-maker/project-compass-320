@@ -53,6 +53,9 @@ interface TranscriptItem {
   translation?: string;
   translating?: boolean;
   translationError?: string;
+  backTranslation?: string;
+  backTranslating?: boolean;
+  backTranslationError?: string;
   audioClips?: string[];
   synthesizing?: boolean;
   synthesisError?: string;
@@ -335,59 +338,89 @@ function TranscribePage() {
             });
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
-                setTranscripts((prev) =>
-                  prev.map((item) =>
-                    item.id === id
-                      ? {
-                          ...item,
-                          translation: result.translation,
-                          translating: false,
-                          synthesizing: true,
+                    setTranscripts((prev) =>
+                      prev.map((item) =>
+                        item.id === id
+                          ? {
+                              ...item,
+                              translation: result.translation,
+                              translating: false,
+                              synthesizing: true,
+                              backTranslating: true,
+                            }
+                          : item
+                      )
+                    );
+                    fetchSynthesize({ data: { text: result.translation } })
+                      .then((synthResult) => {
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  audioClips: synthResult.clips,
+                                  synthesizing: false,
+                                }
+                              : item
+                          )
+                        );
+                        const channel = channelRef.current;
+                        if (channel) {
+                          void channel.send({
+                            type: "broadcast",
+                            event: "speech",
+                            payload: {
+                              clips: synthResult.clips,
+                              fromRole: role,
+                              segmentId: id,
+                            } as BroadcastSpeechPayload,
+                          });
                         }
-                      : item
-                  )
-                );
-                fetchSynthesize({ data: { text: result.translation } })
-                  .then((synthResult) => {
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              audioClips: synthResult.clips,
-                              synthesizing: false,
-                            }
-                          : item
-                      )
-                    );
-                    const channel = channelRef.current;
-                    if (channel) {
-                      void channel.send({
-                        type: "broadcast",
-                        event: "speech",
-                        payload: {
-                          clips: synthResult.clips,
-                          fromRole: role,
-                          segmentId: id,
-                        } as BroadcastSpeechPayload,
+                      })
+                      .catch((err) => {
+                        console.error("Sprachausgabe fehlgeschlagen:", err);
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  synthesisError: "Sprachausgabe fehlgeschlagen",
+                                  synthesizing: false,
+                                }
+                              : item
+                          )
+                        );
                       });
-                    }
+                    // Rückübersetzung läuft parallel und blockiert TTS/Broadcast nicht.
+                    fetchTranslate({ data: { text: result.translation, direction: "back" } })
+                      .then((backResult) => {
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  backTranslation: backResult.translation,
+                                  backTranslating: false,
+                                }
+                              : item
+                          )
+                        );
+                      })
+                      .catch((err) => {
+                        console.error("Rückübersetzung fehlgeschlagen:", err);
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  backTranslationError: "Rückübersetzung fehlgeschlagen",
+                                  backTranslating: false,
+                                }
+                              : item
+                          )
+                        );
+                      });
                   })
-                  .catch((err) => {
-                    console.error("Sprachausgabe fehlgeschlagen:", err);
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              synthesisError: "Sprachausgabe fehlgeschlagen",
-                              synthesizing: false,
-                            }
-                          : item
-                      )
-                    );
-                  });
-              })
               .catch((err) => {
                 console.error("Übersetzung fehlgeschlagen:", err);
                 setTranscripts((prev) =>
@@ -565,6 +598,21 @@ function TranscribePage() {
                   {t.translation && (
                     <span className="block text-sm italic text-muted-foreground">
                       {t.translation}
+                    </span>
+                  )}
+                  {t.backTranslating && (
+                    <span className="block text-xs text-muted-foreground">
+                      Rückübersetzung läuft …
+                    </span>
+                  )}
+                  {t.backTranslationError && (
+                    <span className="block text-xs text-destructive">
+                      {t.backTranslationError}
+                    </span>
+                  )}
+                  {t.backTranslation && (
+                    <span className="block text-xs text-muted-foreground">
+                      Rückübersetzung zur Kontrolle: {t.backTranslation}
                     </span>
                   )}
                   {t.synthesizing && (
