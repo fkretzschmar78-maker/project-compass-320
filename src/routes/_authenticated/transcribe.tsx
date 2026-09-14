@@ -555,7 +555,7 @@ function TranscribePage() {
           </p>
 
           <div className="rounded-md border bg-muted/40 p-3">
-            <p className="text-sm font-medium">
+            <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
             </p>
             {receivedSegments.length > 0 && (
@@ -563,7 +563,7 @@ function TranscribePage() {
                 {receivedSegments.map((id) => (
                   <li
                     key={id}
-                    className="truncate text-xs font-mono text-muted-foreground"
+                    className="truncate text-[13px] font-mono text-muted-foreground"
                     title={id}
                   >
                     {id}
@@ -572,11 +572,17 @@ function TranscribePage() {
               </ul>
             )}
             {receivedSegments.length === 0 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 Noch keine empfangen.
               </p>
             )}
           </div>
+          {isRecording && (
+            <div className="flex items-center justify-center gap-2 text-sm text-app-text">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-translation-accent motion-safe:animate-pulse" />
+              Aufnahme läuft
+            </div>
+          )}
           <div className="flex justify-center">
             <Button
               onClick={isRecording ? stop : start}
@@ -585,6 +591,7 @@ function TranscribePage() {
               {isRecording ? "Aufnahme stoppen" : "Aufnahme starten"}
             </Button>
           </div>
+
           {error && (
             <p className="text-center text-sm text-destructive">{error}</p>
           )}
