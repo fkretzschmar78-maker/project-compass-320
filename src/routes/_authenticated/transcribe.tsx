@@ -338,59 +338,89 @@ function TranscribePage() {
             });
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
-                setTranscripts((prev) =>
-                  prev.map((item) =>
-                    item.id === id
-                      ? {
-                          ...item,
-                          translation: result.translation,
-                          translating: false,
-                          synthesizing: true,
+                    setTranscripts((prev) =>
+                      prev.map((item) =>
+                        item.id === id
+                          ? {
+                              ...item,
+                              translation: result.translation,
+                              translating: false,
+                              synthesizing: true,
+                              backTranslating: true,
+                            }
+                          : item
+                      )
+                    );
+                    fetchSynthesize({ data: { text: result.translation } })
+                      .then((synthResult) => {
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  audioClips: synthResult.clips,
+                                  synthesizing: false,
+                                }
+                              : item
+                          )
+                        );
+                        const channel = channelRef.current;
+                        if (channel) {
+                          void channel.send({
+                            type: "broadcast",
+                            event: "speech",
+                            payload: {
+                              clips: synthResult.clips,
+                              fromRole: role,
+                              segmentId: id,
+                            } as BroadcastSpeechPayload,
+                          });
                         }
-                      : item
-                  )
-                );
-                fetchSynthesize({ data: { text: result.translation } })
-                  .then((synthResult) => {
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              audioClips: synthResult.clips,
-                              synthesizing: false,
-                            }
-                          : item
-                      )
-                    );
-                    const channel = channelRef.current;
-                    if (channel) {
-                      void channel.send({
-                        type: "broadcast",
-                        event: "speech",
-                        payload: {
-                          clips: synthResult.clips,
-                          fromRole: role,
-                          segmentId: id,
-                        } as BroadcastSpeechPayload,
+                      })
+                      .catch((err) => {
+                        console.error("Sprachausgabe fehlgeschlagen:", err);
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  synthesisError: "Sprachausgabe fehlgeschlagen",
+                                  synthesizing: false,
+                                }
+                              : item
+                          )
+                        );
                       });
-                    }
+                    // Rückübersetzung läuft parallel und blockiert TTS/Broadcast nicht.
+                    fetchTranslate({ data: { text: result.translation, direction: "back" } })
+                      .then((backResult) => {
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  backTranslation: backResult.translation,
+                                  backTranslating: false,
+                                }
+                              : item
+                          )
+                        );
+                      })
+                      .catch((err) => {
+                        console.error("Rückübersetzung fehlgeschlagen:", err);
+                        setTranscripts((prev) =>
+                          prev.map((item) =>
+                            item.id === id
+                              ? {
+                                  ...item,
+                                  backTranslationError: "Rückübersetzung fehlgeschlagen",
+                                  backTranslating: false,
+                                }
+                              : item
+                          )
+                        );
+                      });
                   })
-                  .catch((err) => {
-                    console.error("Sprachausgabe fehlgeschlagen:", err);
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              synthesisError: "Sprachausgabe fehlgeschlagen",
-                              synthesizing: false,
-                            }
-                          : item
-                      )
-                    );
-                  });
-              })
               .catch((err) => {
                 console.error("Übersetzung fehlgeschlagen:", err);
                 setTranscripts((prev) =>
