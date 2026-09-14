@@ -240,7 +240,6 @@ function TranscribePage() {
 
       ws.onerror = (event) => {
         console.error("WebSocket-Fehler", event);
-        fail("Verbindungsfehler zur Spracherkennung");
       };
 
       ws.onclose = (event) => {
