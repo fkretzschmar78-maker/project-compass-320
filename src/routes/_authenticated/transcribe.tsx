@@ -260,6 +260,25 @@ function TranscribePage() {
               <span className="font-medium">{ROLE_LABEL[role]}</span>
             </p>
 
+            {releasedAkte && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-app-text">
+                    Freigegebene Aktennotiz
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <AkteSection title="Anamnese" text={releasedAkte.anamnese} />
+                  <AkteSection title="Befund" text={releasedAkte.befund} />
+                  <AkteSection
+                    title="Beurteilung"
+                    text={releasedAkte.beurteilung}
+                  />
+                  <AkteSection title="Prozedere" text={releasedAkte.prozedere} />
+                </CardContent>
+              </Card>
+            )}
+
             <div className="rounded-md border bg-muted/40 p-4">
               <p className="mb-2 text-sm font-medium text-app-text">
                 Empfangene Segmente
