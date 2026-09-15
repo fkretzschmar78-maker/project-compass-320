@@ -698,7 +698,7 @@ function TranscribePage() {
           {isRecording && (
             <div className="flex items-center justify-center gap-2 text-sm text-app-text">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-translation-accent motion-safe:animate-pulse" />
-              Aufnahme läuft
+              Übersetzung läuft
             </div>
           )}
           <div className="flex justify-center">
@@ -706,7 +706,7 @@ function TranscribePage() {
               onClick={isRecording ? stop : start}
               variant={isRecording ? "destructive" : "default"}
             >
-              {isRecording ? "Aufnahme stoppen" : "Aufnahme starten"}
+              {isRecording ? "Live-Übersetzung beenden" : "Live-Übersetzung starten"}
             </Button>
           </div>
 
