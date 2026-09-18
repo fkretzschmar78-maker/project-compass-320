@@ -209,6 +209,9 @@ function TranscribePage() {
             const segmentId = payload.segmentId || "unknown";
             setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
             enqueueClips(payload.clips);
+            if (typeof payload.sentAt === "number") {
+              setLastBroadcastLatency((Date.now() - payload.sentAt) / 1000);
+            }
           }
         },
       )
