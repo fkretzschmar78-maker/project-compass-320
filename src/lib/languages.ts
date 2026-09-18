@@ -2,8 +2,8 @@
 export const LANGUAGES = [
   { code: "de", label: "Deutsch" },
   { code: "en", label: "Englisch" },
-  { code: "hi", label: "Hindi" },
-  { code: "uk", label: "Ukrainisch" },
+  { code: "hi", label: "Hindi", scriptNote: "in Devanagari-Schrift, nicht in lateinischer Umschrift" },
+  { code: "uk", label: "Ukrainisch", scriptNote: "in kyrillischer Schrift, nicht in lateinischer Umschrift" },
   { code: "tr", label: "Türkisch" },
 ] as const;
 
@@ -18,4 +18,9 @@ export function isLanguageCode(value: string): value is LanguageCode {
 
 export function languageLabel(code: LanguageCode): string {
   return LANGUAGES.find((l) => l.code === code)!.label;
+}
+
+export function languageScriptNote(code: LanguageCode): string | undefined {
+  const lang = LANGUAGES.find((l) => l.code === code)!;
+  return (lang as { scriptNote?: string }).scriptNote;
 }
