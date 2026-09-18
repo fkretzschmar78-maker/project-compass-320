@@ -699,51 +699,67 @@ function TranscribePage() {
                         console.error("Protokollierung fehlgeschlagen:", err),
                       );
                     }
-                    fetchSynthesize({ data: { text: result.translation } })
-                      .then((synthResult) => {
-                        const ttsReceivedAt = Date.now();
-                        setTranscripts((prev) =>
-                          prev.map((item) =>
-                            item.id === id
-                              ? {
-                                  ...item,
-                                  audioClips: synthResult.clips,
-                                  synthesizing: false,
-                                  ttsReceivedAt,
-                                }
-                              : item
-                          )
-                        );
-                        const channel = channelRef.current;
-                        if (channel) {
-                          void channel.send({
-                            type: "broadcast",
-                            event: "speech",
-                            payload: {
-                              clips: synthResult.clips,
-                              fromRole: role,
-                              segmentId: id,
-                              originalText: transcript,
-                              translatedText: result.translation,
-                              sentAt: Date.now(),
-                            } as BroadcastSpeechPayload,
-                          });
-                        }
-                      })
-                      .catch((err) => {
-                        console.error("Sprachausgabe fehlgeschlagen:", err);
-                        setTranscripts((prev) =>
-                          prev.map((item) =>
-                            item.id === id
-                              ? {
-                                  ...item,
-                                  synthesisError: "Sprachausgabe fehlgeschlagen",
-                                  synthesizing: false,
-                                }
-                              : item
-                          )
-                        );
-                      });
+                    if (useStreamingTts) {
+                      const ttsReceivedAt = Date.now();
+                      setTranscripts((prev) =>
+                        prev.map((item) =>
+                          item.id === id
+                            ? {
+                                ...item,
+                                synthesizing: false,
+                                ttsReceivedAt,
+                              }
+                            : item
+                        )
+                      );
+                      void streamTts(result.translation);
+                    } else {
+                      fetchSynthesize({ data: { text: result.translation } })
+                        .then((synthResult) => {
+                          const ttsReceivedAt = Date.now();
+                          setTranscripts((prev) =>
+                            prev.map((item) =>
+                              item.id === id
+                                ? {
+                                    ...item,
+                                    audioClips: synthResult.clips,
+                                    synthesizing: false,
+                                    ttsReceivedAt,
+                                  }
+                                : item
+                            )
+                          );
+                          const channel = channelRef.current;
+                          if (channel) {
+                            void channel.send({
+                              type: "broadcast",
+                              event: "speech",
+                              payload: {
+                                clips: synthResult.clips,
+                                fromRole: role,
+                                segmentId: id,
+                                originalText: transcript,
+                                translatedText: result.translation,
+                                sentAt: Date.now(),
+                              } as BroadcastSpeechPayload,
+                            });
+                          }
+                        })
+                        .catch((err) => {
+                          console.error("Sprachausgabe fehlgeschlagen:", err);
+                          setTranscripts((prev) =>
+                            prev.map((item) =>
+                              item.id === id
+                                ? {
+                                    ...item,
+                                    synthesisError: "Sprachausgabe fehlgeschlagen",
+                                    synthesizing: false,
+                                  }
+                                : item
+                            )
+                          );
+                        });
+                    }
                     // Rückübersetzung läuft parallel und blockiert TTS/Broadcast nicht.
                     fetchTranslate({ data: { text: result.translation, direction: "back" } })
                       .then((backResult) => {
