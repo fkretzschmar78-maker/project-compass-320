@@ -1030,6 +1030,43 @@ function TranscribePage() {
           </div>
 
           <div className="rounded-md border bg-muted/40 p-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-[13px] font-medium text-app-text">
+                  Streaming-TTS testen (nur lokal)
+                </p>
+                <p className="text-[13px] text-muted-foreground">
+                  Spielt die Übersetzung progressiv direkt im Browser ab.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useStreamingTts}
+                onClick={() => setUseStreamingTts((prev) => !prev)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-control-accent",
+                  useStreamingTts ? "bg-translation-accent" : "bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    useStreamingTts ? "translate-x-6" : "translate-x-1",
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          <audio
+            ref={audioRef}
+            controls
+            src={streamUrl ?? undefined}
+            className="w-full"
+          />
+
+          <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
             </p>
