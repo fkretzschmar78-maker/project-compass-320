@@ -483,7 +483,7 @@ function TranscribePage() {
       wsUrl.searchParams.set("language", language);
       wsUrl.searchParams.set("encoding", "linear16");
       wsUrl.searchParams.set("sample_rate", "16000");
-      wsUrl.searchParams.set("endpointing", "300");
+      wsUrl.searchParams.set("endpointing", "10");
       wsUrl.searchParams.set("interim_results", "true");
 
 
