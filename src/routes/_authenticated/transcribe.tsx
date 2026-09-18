@@ -931,6 +931,25 @@ function TranscribePage() {
                       Rückübersetzung zur Kontrolle: {t.backTranslation}
                     </p>
                   )}
+                  {t.finalAt && (
+                    <p className="text-[13px] text-muted-foreground">
+                      {[
+                        t.translationReceivedAt &&
+                          `Übersetzung: ${(
+                            (t.translationReceivedAt - t.finalAt) /
+                            1000
+                          ).toFixed(1).replace(".", ",")}s`,
+                        t.ttsReceivedAt &&
+                          t.translationReceivedAt &&
+                          `Sprachausgabe: ${(
+                            (t.ttsReceivedAt - t.translationReceivedAt) /
+                            1000
+                          ).toFixed(1).replace(".", ",")}s`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   {t.synthesizing && (
                     <span className="block text-[13px] text-muted-foreground">
                       Sprachausgabe wird erstellt …
