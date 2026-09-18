@@ -109,6 +109,8 @@ function TranscribePage() {
   const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
   const [languageLoading, setLanguageLoading] = useState(true);
   const [languageSaving, setLanguageSaving] = useState(false);
+  const [useStreamingTts, setUseStreamingTts] = useState(false);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
