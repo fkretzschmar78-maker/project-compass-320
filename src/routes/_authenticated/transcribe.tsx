@@ -70,6 +70,9 @@ interface TranscriptItem {
   audioClips?: string[];
   synthesizing?: boolean;
   synthesisError?: string;
+  finalAt?: number;
+  translationReceivedAt?: number;
+  ttsReceivedAt?: number;
 }
 
 interface LiveSegment {
