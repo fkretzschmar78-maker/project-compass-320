@@ -508,18 +508,18 @@ function TranscribePage() {
           if (!transcript) return;
           if (msg.is_final) {
             const id = crypto.randomUUID();
-            console.log(`[Latenz][${id}] Segment final: ${Date.now()}`);
+            const finalAt = Date.now();
             setTranscripts((prev) => {
               const last = prev[prev.length - 1];
               if (last && !last.isFinal) {
                 return [
                   ...prev.slice(0, -1),
-                  { id, text: transcript, isFinal: true, translating: true },
+                  { id, text: transcript, isFinal: true, translating: true, finalAt },
                 ];
               }
               return [
                 ...prev,
-                { id, text: transcript, isFinal: true, translating: true },
+                { id, text: transcript, isFinal: true, translating: true, finalAt },
               ];
             });
             if (role === "patient") {
