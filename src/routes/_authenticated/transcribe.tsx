@@ -525,6 +525,7 @@ function TranscribePage() {
             }
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
+                console.log(`[Latenz][${id}] Translation received: ${Date.now()}`);
                     setTranscripts((prev) =>
                       prev.map((item) =>
                         item.id === id
