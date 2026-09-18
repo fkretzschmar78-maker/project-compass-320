@@ -209,7 +209,7 @@ function TranscribePage() {
             const chunk = queue.shift()!;
             try {
               sourceBufferBusy = true;
-              sourceBuffer.appendBuffer(chunk as ArrayBufferView);
+              sourceBuffer.appendBuffer(chunk.buffer as ArrayBuffer);
             } catch (err) {
               console.error("appendBuffer-Fehler", err);
               sourceBufferBusy = false;
