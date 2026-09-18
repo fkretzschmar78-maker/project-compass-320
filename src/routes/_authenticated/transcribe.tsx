@@ -6,9 +6,19 @@ import { getDeepgramToken } from "@/lib/deepgram.functions";
 import { translateText } from "@/lib/translate.functions";
 import { synthesizeSpeech } from "@/lib/tts.functions";
 import { logConversationSegment } from "@/lib/conversation-log.functions";
+import { setMyLanguage, getSessionLanguages } from "@/lib/session-language.functions";
+import { LANGUAGES, languageLabel } from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -82,6 +92,8 @@ function TranscribePage() {
   const fetchTranslate = useServerFn(translateText);
   const fetchSynthesize = useServerFn(synthesizeSpeech);
   const fetchLogSegment = useServerFn(logConversationSegment);
+  const fetchSetMyLanguage = useServerFn(setMyLanguage);
+  const fetchSessionLanguages = useServerFn(getSessionLanguages);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +101,10 @@ function TranscribePage() {
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
   const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
   const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
+  const [myLanguage, setMyLanguageState] = useState<LanguageCode | null>(null);
+  const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
+  const [languageLoading, setLanguageLoading] = useState(true);
+  const [languageSaving, setLanguageSaving] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -97,6 +113,7 @@ function TranscribePage() {
   const audioQueueRef = useRef<string[][]>([]);
   const isPlayingRef = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const languagesReadyRef = useRef(false);
 
   function enqueueClips(clips: string[]) {
     audioQueueRef.current.push(clips);
@@ -214,6 +231,48 @@ function TranscribePage() {
     return () => {
       void channel.unsubscribe();
       channelRef.current = null;
+    };
+  }, [role]);
+
+  useEffect(() => {
+    languagesReadyRef.current = !!(myLanguage && otherLanguage);
+  }, [myLanguage, otherLanguage]);
+
+  useEffect(() => {
+    if (role !== "arzt" && role !== "patient") return;
+
+    let mounted = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    async function loadLanguages() {
+      try {
+        const result = await fetchSessionLanguages({ data: undefined });
+        if (!mounted) return;
+        if (role === "arzt") {
+          setMyLanguageState(result.arzt);
+          setOtherLanguage(result.patient);
+        } else {
+          setMyLanguageState(result.patient);
+          setOtherLanguage(result.arzt);
+        }
+      } catch (err) {
+        console.error("Sprachen konnten nicht geladen werden", err);
+      } finally {
+        if (mounted) setLanguageLoading(false);
+      }
+    }
+
+    void loadLanguages();
+
+    intervalId = setInterval(() => {
+      if (!languagesReadyRef.current) {
+        void loadLanguages();
+      }
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
     };
   }, [role]);
 
@@ -658,6 +717,30 @@ function TranscribePage() {
     setIsRecording(false);
   }
 
+  async function handleLanguageChange(code: LanguageCode) {
+    setLanguageSaving(true);
+    setError(null);
+    try {
+      await fetchSetMyLanguage({ data: { languageCode: code } });
+      const result = await fetchSessionLanguages({ data: undefined });
+      if (role === "arzt") {
+        setMyLanguageState(result.arzt);
+        setOtherLanguage(result.patient);
+      } else {
+        setMyLanguageState(result.patient);
+        setOtherLanguage(result.arzt);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Sprache konnte nicht gespeichert werden",
+      );
+    } finally {
+      setLanguageSaving(false);
+    }
+  }
+
   return (
     <main className="flex min-h-full flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
@@ -671,6 +754,67 @@ function TranscribePage() {
               {ROLE_LABEL[role]}
             </span>
           </p>
+
+          <div className="space-y-3 rounded-md border bg-muted/40 p-4">
+            <label
+              htmlFor="language-select"
+              className="text-sm font-medium text-app-text"
+            >
+              Ihre Sprache
+            </label>
+            <Select
+              value={myLanguage ?? ""}
+              onValueChange={(value) =>
+                handleLanguageChange(value as LanguageCode)
+              }
+              disabled={languageLoading || languageSaving || isRecording}
+            >
+              <SelectTrigger
+                id="language-select"
+                className="w-full bg-app-background"
+              >
+                <SelectValue placeholder="Sprache auswählen …" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {languageLoading && (
+              <p className="text-[13px] text-muted-foreground">
+                Sprache wird geladen …
+              </p>
+            )}
+
+            {!myLanguage && !languageLoading && (
+              <p className="text-[13px] text-destructive">
+                Bitte wählen Sie zuerst Ihre Sprache aus, bevor Sie die
+                Live-Übersetzung starten.
+              </p>
+            )}
+
+            {myLanguage && !otherLanguage && !languageLoading && (
+              <p className="text-[13px] text-destructive">
+                Warten auf die Sprachwahl der Gegenseite, bevor die
+                Live-Übersetzung starten kann.
+              </p>
+            )}
+
+            {myLanguage && (
+              <p className="text-[13px] text-muted-foreground">
+                Gegenseite:{" "}
+                <span className="font-medium text-app-text">
+                  {otherLanguage
+                    ? languageLabel(otherLanguage)
+                    : "noch nicht gewählt"}
+                </span>
+              </p>
+            )}
+          </div>
 
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
@@ -705,6 +849,7 @@ function TranscribePage() {
             <Button
               onClick={isRecording ? stop : start}
               variant={isRecording ? "destructive" : "default"}
+              disabled={!myLanguage || !otherLanguage}
             >
               {isRecording ? "Live-Übersetzung beenden" : "Live-Übersetzung starten"}
             </Button>
