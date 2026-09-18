@@ -485,6 +485,12 @@ function TranscribePage() {
       wsUrl.searchParams.set("sample_rate", "16000");
       wsUrl.searchParams.set("endpointing", "10");
       wsUrl.searchParams.set("interim_results", "true");
+      wsUrl.searchParams.append("keyterm", "Metformin");
+      wsUrl.searchParams.append("keyterm", "Hypertonie");
+      wsUrl.searchParams.append("keyterm", "Bauchschmerzen");
+      wsUrl.searchParams.append("keyterm", "Appendizitis");
+      wsUrl.searchParams.append("keyterm", "Appendix");
+      wsUrl.searchParams.append("keyterm", "Ultraschall");
 
 
       // Authentifizierung gegen Deepgram per Sec-WebSocket-Protocol.
