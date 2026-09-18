@@ -11,7 +11,8 @@ import { getLiveKitToken } from "@/lib/livekit.functions";
 import { LANGUAGES, languageLabel } from "@/lib/languages";
 import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
-import { Room, RoomEvent } from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
+import type { RemoteTrack, RemoteTrackPublication } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -131,6 +132,10 @@ function TranscribePage() {
   const streamUrlRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const roomRef = useRef<Room | null>(null);
+  // Sender: aktuell über LiveKit veröffentlichte Audiospur aus dem <audio>-Element
+  const publishedTrackRef = useRef<MediaStreamTrack | null>(null);
+  // Empfänger: <audio>-Element für eingehende LiveKit-Spuren der Gegenseite
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
 
   function enqueueClips(clips: string[]) {
@@ -181,6 +186,19 @@ function TranscribePage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Keine Sitzung");
 
+      // Alte LiveKit-Spur aufräumen, bevor ein neuer Stream startet
+      if (publishedTrackRef.current && roomRef.current) {
+        try {
+          roomRef.current.localParticipant.unpublishTrack(
+            publishedTrackRef.current,
+          );
+          publishedTrackRef.current.stop();
+        } catch {
+          // ignore
+        }
+        publishedTrackRef.current = null;
+      }
+
       const mimeType = "audio/mpeg";
       if (!MediaSource.isTypeSupported(mimeType)) {
         throw new Error(`MediaSource unterstützt ${mimeType} in diesem Browser nicht`);
@@ -202,6 +220,42 @@ function TranscribePage() {
       const objectUrl = URL.createObjectURL(mediaSource);
       streamUrlRef.current = objectUrl;
       setStreamUrl(objectUrl);
+
+      // LiveKit-Publishing: Audioausgabe des <audio>-Elements per captureStream()
+      // als MediaStreamTrack abgreifen und an den Raum veröffentlichen.
+      // Das Element bleibt lokal stumm (muted), hören tut nur die Gegenseite.
+      const room = roomRef.current;
+      const audioEl = audioRef.current;
+      if (room && audioEl) {
+        const capture = (
+          audioEl as HTMLAudioElement & { captureStream?: () => MediaStream }
+        ).captureStream;
+        if (!capture) {
+          setLiveKitError(
+            "Dieser Browser unterstützt captureStream() nicht — keine LiveKit-Übertragung.",
+          );
+        } else if (!room.localParticipant.permissions?.canPublish) {
+          // Spectator: nur zuhören, nichts veröffentlichen
+        } else {
+          try {
+            const mediaStream = capture.call(audioEl);
+            const mediaTrack = mediaStream.getAudioTracks()[0];
+            if (mediaTrack) {
+              await room.localParticipant.publishTrack(mediaTrack, {
+                source: Track.Source.Unknown,
+              });
+              publishedTrackRef.current = mediaTrack;
+            }
+          } catch (err) {
+            console.error("LiveKit-Publish fehlgeschlagen:", err);
+            setLiveKitError(
+              err instanceof Error
+                ? err.message
+                : "LiveKit-Publish fehlgeschlagen",
+            );
+          }
+        }
+      }
 
       mediaSource.addEventListener("sourceopen", async () => {
         try {
@@ -333,6 +387,21 @@ function TranscribePage() {
         setLiveKitParticipantCount(room.numParticipants);
       });
 
+      // Empfänger-Seite: eingehende Audio-Spur der Gegenseite automatisch
+      // an ein <audio>-Element hängen und abspielen.
+      room.on(
+        RoomEvent.TrackSubscribed,
+        (track: RemoteTrack, _publication: RemoteTrackPublication) => {
+          if (track.kind !== Track.Kind.Audio) return;
+          const el = remoteAudioRef.current;
+          if (!el) return;
+          track.attach(el);
+          el.play().catch((err) =>
+            console.error("Remote-Audio konnte nicht starten:", err),
+          );
+        },
+      );
+
       await room.connect(result.url, result.token);
     } catch (err) {
       setLiveKitConnected(false);
@@ -343,6 +412,14 @@ function TranscribePage() {
   }
 
   function disconnectLiveKit() {
+    if (publishedTrackRef.current) {
+      try {
+        publishedTrackRef.current.stop();
+      } catch {
+        // ignore
+      }
+      publishedTrackRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
@@ -1118,9 +1195,13 @@ function TranscribePage() {
           <audio
             ref={audioRef}
             controls
+            muted={useStreamingTts}
             src={streamUrl ?? undefined}
             className="w-full"
           />
+
+          {/* Empfänger: hier landen eingehende LiveKit-Audiospuren der Gegenseite */}
+          <audio ref={remoteAudioRef} className="hidden" />
 
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
