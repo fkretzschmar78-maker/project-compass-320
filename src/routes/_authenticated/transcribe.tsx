@@ -501,6 +501,7 @@ function TranscribePage() {
           if (!transcript) return;
           if (msg.is_final) {
             const id = crypto.randomUUID();
+            console.log(`[Latenz][${id}] Segment final: ${Date.now()}`);
             setTranscripts((prev) => {
               const last = prev[prev.length - 1];
               if (last && !last.isFinal) {
