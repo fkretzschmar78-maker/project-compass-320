@@ -863,6 +863,22 @@ function TranscribePage() {
       keepAliveIntervalRef.current = null;
     }
 
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (streamUrlRef.current) {
+      URL.revokeObjectURL(streamUrlRef.current);
+      streamUrlRef.current = null;
+      setStreamUrl(null);
+    }
+
     const ctx = audioCtxRef.current;
     const worklet = workletNodeRef.current;
     const stream = mediaStreamRef.current;
