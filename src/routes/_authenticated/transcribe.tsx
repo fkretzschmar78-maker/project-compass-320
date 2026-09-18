@@ -121,6 +121,8 @@ function TranscribePage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const languagesReadyRef = useRef(false);
   const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamUrlRef = useRef<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
 
   function enqueueClips(clips: string[]) {
