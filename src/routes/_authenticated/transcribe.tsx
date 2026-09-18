@@ -562,6 +562,7 @@ function TranscribePage() {
                         );
                         const channel = channelRef.current;
                         if (channel) {
+                          console.log(`[Latenz][${id}] Broadcast sending: ${Date.now()}`);
                           void channel.send({
                             type: "broadcast",
                             event: "speech",
