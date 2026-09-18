@@ -130,6 +130,7 @@ function TranscribePage() {
   const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamUrlRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const roomRef = useRef<Room | null>(null);
 
 
   function enqueueClips(clips: string[]) {
