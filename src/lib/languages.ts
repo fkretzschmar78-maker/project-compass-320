@@ -21,5 +21,6 @@ export function languageLabel(code: LanguageCode): string {
 }
 
 export function languageScriptNote(code: LanguageCode): string | undefined {
-  return LANGUAGES.find((l) => l.code === code)?.scriptNote;
+  const lang = LANGUAGES.find((l) => l.code === code)!;
+  return (lang as { scriptNote?: string }).scriptNote;
 }
