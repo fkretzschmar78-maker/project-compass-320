@@ -6,9 +6,19 @@ import { getDeepgramToken } from "@/lib/deepgram.functions";
 import { translateText } from "@/lib/translate.functions";
 import { synthesizeSpeech } from "@/lib/tts.functions";
 import { logConversationSegment } from "@/lib/conversation-log.functions";
+import { setMyLanguage, getSessionLanguages } from "@/lib/session-language.functions";
+import { LANGUAGES, languageLabel } from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
