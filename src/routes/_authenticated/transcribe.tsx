@@ -11,7 +11,8 @@ import { getLiveKitToken } from "@/lib/livekit.functions";
 import { LANGUAGES, languageLabel } from "@/lib/languages";
 import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
-import { Room, RoomEvent } from "livekit-client";
+import { LocalAudioTrack, Room, RoomEvent, Track } from "livekit-client";
+import type { RemoteTrack, RemoteTrackPublication } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -131,6 +132,10 @@ function TranscribePage() {
   const streamUrlRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const roomRef = useRef<Room | null>(null);
+  // Sender: aktuell über LiveKit veröffentlichte Audiospur aus dem <audio>-Element
+  const publishedTrackRef = useRef<LocalAudioTrack | null>(null);
+  // Empfänger: <audio>-Element für eingehende LiveKit-Spuren der Gegenseite
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
 
   function enqueueClips(clips: string[]) {
