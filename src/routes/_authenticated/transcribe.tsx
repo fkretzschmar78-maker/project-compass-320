@@ -167,6 +167,134 @@ function TranscribePage() {
     });
   }
 
+  async function streamTts(text: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Keine Sitzung");
+
+      const mimeType = "audio/mpeg";
+      if (!MediaSource.isTypeSupported(mimeType)) {
+        throw new Error(`MediaSource unterstützt ${mimeType} in diesem Browser nicht`);
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      }
+
+      if (streamUrlRef.current) {
+        URL.revokeObjectURL(streamUrlRef.current);
+        streamUrlRef.current = null;
+        setStreamUrl(null);
+      }
+
+      const mediaSource = new MediaSource();
+      const objectUrl = URL.createObjectURL(mediaSource);
+      streamUrlRef.current = objectUrl;
+      setStreamUrl(objectUrl);
+
+      mediaSource.addEventListener("sourceopen", async () => {
+        try {
+          const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+          const queue: Uint8Array[] = [];
+          let started = false;
+          let sourceBufferBusy = false;
+          let streamDone = false;
+
+          const flushQueue = () => {
+            if (sourceBufferBusy || queue.length === 0) return;
+            const chunk = queue.shift()!;
+            try {
+              sourceBufferBusy = true;
+              sourceBuffer.appendBuffer(chunk);
+            } catch (err) {
+              console.error("appendBuffer-Fehler", err);
+              sourceBufferBusy = false;
+              flushQueue();
+            }
+          };
+
+          sourceBuffer.addEventListener("updateend", () => {
+            sourceBufferBusy = false;
+            if (!started) {
+              started = true;
+              audioRef.current?.play().catch((err) =>
+                console.error("Audio-Wiedergabe konnte nicht starten:", err),
+              );
+            }
+            flushQueue();
+            if (
+              streamDone &&
+              queue.length === 0 &&
+              !sourceBufferBusy &&
+              mediaSource.readyState === "open"
+            ) {
+              try {
+                mediaSource.endOfStream();
+              } catch {
+                // ignore
+              }
+            }
+          });
+
+          sourceBuffer.addEventListener("error", (err) => {
+            console.error("SourceBuffer-Fehler", err);
+          });
+
+          const res = await fetch("/api/synthesize-stream", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text }),
+          });
+          if (!res.ok) throw new Error(`Stream-TTS fehlgeschlagen: ${res.status}`);
+          if (!res.body) throw new Error("Kein Response-Body");
+
+          const reader = res.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              streamDone = true;
+              if (
+                queue.length === 0 &&
+                !sourceBufferBusy &&
+                mediaSource.readyState === "open"
+              ) {
+                try {
+                  mediaSource.endOfStream();
+                } catch {
+                  // ignore
+                }
+              }
+              break;
+            }
+            queue.push(value);
+            flushQueue();
+          }
+        } catch (err) {
+          console.error("MediaSource-Fehler:", err);
+          if (mediaSource.readyState === "open") {
+            try {
+              mediaSource.endOfStream();
+            } catch {
+              // ignore
+            }
+          }
+        }
+      });
+
+      mediaSource.addEventListener("error", (err) => {
+        console.error("MediaSource-Fehler", err);
+      });
+    } catch (err) {
+      console.error("Stream-TTS-Fehler:", err);
+    }
+  }
+
   useEffect(() => {
     return () => {
       void stop();
