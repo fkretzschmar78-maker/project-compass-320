@@ -1151,6 +1151,40 @@ function TranscribePage() {
               </p>
             )}
           </div>
+
+          <div className="rounded-md border bg-muted/40 p-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-[13px] font-medium text-app-text">
+                  LiveKit-Raum (Test)
+                </p>
+                <p className="truncate text-[13px] text-muted-foreground">
+                  Status:{" "}
+                  <span
+                    className={
+                      liveKitConnected
+                        ? "font-medium text-translation-accent"
+                        : undefined
+                    }
+                  >
+                    {liveKitConnected ? "verbunden" : "getrennt"}
+                  </span>
+                  {" · "}Teilnehmer: {liveKitParticipantCount}
+                </p>
+                {liveKitError && (
+                  <p className="text-[13px] text-destructive">{liveKitError}</p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={liveKitConnected ? disconnectLiveKit : connectLiveKit}
+              >
+                {liveKitConnected ? "Trennen" : "Verbinden"}
+              </Button>
+            </div>
+          </div>
+
           {isRecording && (
             <div className="flex items-center justify-center gap-2 text-sm text-app-text">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-translation-accent motion-safe:animate-pulse" />
