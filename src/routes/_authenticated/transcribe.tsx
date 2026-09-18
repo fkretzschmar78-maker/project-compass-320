@@ -176,6 +176,9 @@ function TranscribePage() {
         { event: "speech" },
         (message: { payload?: BroadcastSpeechPayload }) => {
           const payload = message.payload;
+          if (payload?.segmentId) {
+            console.log(`[Latenz][${payload.segmentId}] Broadcast received: ${Date.now()}`);
+          }
           if (!payload || !Array.isArray(payload.clips)) return;
 
           if (role === "spectator") {
