@@ -186,6 +186,19 @@ function TranscribePage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Keine Sitzung");
 
+      // Alte LiveKit-Spur aufräumen, bevor ein neuer Stream startet
+      if (publishedTrackRef.current && roomRef.current) {
+        try {
+          roomRef.current.localParticipant.unpublishTrack(
+            publishedTrackRef.current,
+          );
+          publishedTrackRef.current.stop();
+        } catch {
+          // ignore
+        }
+        publishedTrackRef.current = null;
+      }
+
       const mimeType = "audio/mpeg";
       if (!MediaSource.isTypeSupported(mimeType)) {
         throw new Error(`MediaSource unterstützt ${mimeType} in diesem Browser nicht`);
@@ -207,6 +220,43 @@ function TranscribePage() {
       const objectUrl = URL.createObjectURL(mediaSource);
       streamUrlRef.current = objectUrl;
       setStreamUrl(objectUrl);
+
+      // LiveKit-Publishing: Audioausgabe des <audio>-Elements per captureStream()
+      // als MediaStreamTrack abgreifen und an den Raum veröffentlichen.
+      // Das Element bleibt lokal stumm (muted), hören tut nur die Gegenseite.
+      const room = roomRef.current;
+      const audioEl = audioRef.current;
+      if (room && audioEl) {
+        const capture = (
+          audioEl as HTMLAudioElement & { captureStream?: () => MediaStream }
+        ).captureStream;
+        if (!capture) {
+          setLiveKitError(
+            "Dieser Browser unterstützt captureStream() nicht — keine LiveKit-Übertragung.",
+          );
+        } else if (!room.localParticipant.permissions?.canPublish) {
+          // Spectator: nur zuhören, nichts veröffentlichen
+        } else {
+          try {
+            const mediaStream = capture.call(audioEl);
+            const mediaTrack = mediaStream.getAudioTracks()[0];
+            if (mediaTrack) {
+              const localTrack = new LocalAudioTrack(mediaTrack);
+              await room.localParticipant.publishTrack(localTrack, {
+                source: Track.Source.Unknown,
+              });
+              publishedTrackRef.current = localTrack;
+            }
+          } catch (err) {
+            console.error("LiveKit-Publish fehlgeschlagen:", err);
+            setLiveKitError(
+              err instanceof Error
+                ? err.message
+                : "LiveKit-Publish fehlgeschlagen",
+            );
+          }
+        }
+      }
 
       mediaSource.addEventListener("sourceopen", async () => {
         try {
