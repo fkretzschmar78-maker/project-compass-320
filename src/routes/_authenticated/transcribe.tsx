@@ -529,20 +529,21 @@ function TranscribePage() {
             }
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
-                console.log(`[Latenz][${id}] Translation received: ${Date.now()}`);
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              translation: result.translation,
-                              translating: false,
-                              synthesizing: true,
-                              backTranslating: true,
-                            }
-                          : item
-                      )
-                    );
+                const translationReceivedAt = Date.now();
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translation: result.translation,
+                          translating: false,
+                          synthesizing: true,
+                          backTranslating: true,
+                          translationReceivedAt,
+                        }
+                      : item
+                  )
+                );
                     if (role === "arzt") {
                       void fetchLogSegment({
                         data: { text: result.translation },
