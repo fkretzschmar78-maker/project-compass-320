@@ -12,7 +12,12 @@ import { LANGUAGES, languageLabel } from "@/lib/languages";
 import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
 import { Room, RoomEvent, Track } from "livekit-client";
-import type { RemoteTrack, RemoteTrackPublication } from "livekit-client";
+import type {
+  RemoteParticipant,
+  RemoteTrack,
+  RemoteTrackPublication,
+} from "livekit-client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -119,6 +124,15 @@ function TranscribePage() {
   const [liveKitConnected, setLiveKitConnected] = useState(false);
   const [liveKitParticipantCount, setLiveKitParticipantCount] = useState(0);
   const [liveKitError, setLiveKitError] = useState<string | null>(null);
+  const [liveKitPublishedCount, setLiveKitPublishedCount] = useState(0);
+  const [liveKitReceivedCount, setLiveKitReceivedCount] = useState(0);
+  const [liveKitLastSender, setLiveKitLastSender] = useState<string | null>(
+    null,
+  );
+  const [publishCaptureMuted, setPublishCaptureMuted] = useState<boolean | null>(
+    null,
+  );
+
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -258,11 +272,15 @@ function TranscribePage() {
               if (room && audioEl) {
                 audioEl.muted = true;
 
+                // Diagnose: muted-State im Moment des captureStream()-Aufrufs
+                setPublishCaptureMuted(audioEl.muted);
+
                 const capture = (
                   audioEl as HTMLAudioElement & {
                     captureStream?: () => MediaStream;
                   }
                 ).captureStream;
+
 
                 if (!capture) {
                   setLiveKitError(
@@ -282,6 +300,9 @@ function TranscribePage() {
                         .publishTrack(mediaTrack, {
                           source: Track.Source.Unknown,
                         })
+                        .then(() => {
+                          setLiveKitPublishedCount((n) => n + 1);
+                        })
                         .catch((err) => {
                           console.error("LiveKit-Publish fehlgeschlagen:", err);
                           setLiveKitError(
@@ -290,6 +311,7 @@ function TranscribePage() {
                               : "LiveKit-Publish fehlgeschlagen",
                           );
                         });
+
                     }
                   } catch (err) {
                     console.error("LiveKit-Publish fehlgeschlagen:", err);
@@ -415,7 +437,11 @@ function TranscribePage() {
       // an ein <audio>-Element hängen und abspielen.
       room.on(
         RoomEvent.TrackSubscribed,
-        (track: RemoteTrack, _publication: RemoteTrackPublication) => {
+        (
+          track: RemoteTrack,
+          _publication: RemoteTrackPublication,
+          participant: RemoteParticipant,
+        ) => {
           if (track.kind !== Track.Kind.Audio) return;
           const el = remoteAudioRef.current;
           if (!el) return;
@@ -423,8 +449,11 @@ function TranscribePage() {
           el.play().catch((err) =>
             console.error("Remote-Audio konnte nicht starten:", err),
           );
+          setLiveKitReceivedCount((n) => n + 1);
+          setLiveKitLastSender(participant.identity);
         },
       );
+
 
       await room.connect(result.url, result.token);
     } catch (err) {
@@ -1276,6 +1305,22 @@ function TranscribePage() {
                   </span>
                   {" · "}Teilnehmer: {liveKitParticipantCount}
                 </p>
+                <p className="truncate text-[13px] text-muted-foreground">
+                  Spuren veröffentlicht: {liveKitPublishedCount}
+                  {" · "}Spuren empfangen: {liveKitReceivedCount}
+                  {liveKitLastSender && (
+                    <span className="ml-1">
+                      · Letzter Sender: {liveKitLastSender}
+                    </span>
+                  )}
+                </p>
+                {publishCaptureMuted !== null && (
+                  <p className="text-[13px] text-muted-foreground">
+                    Element stumm beim Capture:{" "}
+                    {publishCaptureMuted ? "ja" : "nein"}
+                  </p>
+                )}
+
                 {liveKitError && (
                   <p className="text-[13px] text-destructive">{liveKitError}</p>
                 )}
