@@ -221,41 +221,6 @@ function TranscribePage() {
       streamUrlRef.current = objectUrl;
       setStreamUrl(objectUrl);
 
-      // LiveKit-Publishing: Audioausgabe des <audio>-Elements per captureStream()
-      // als MediaStreamTrack abgreifen und an den Raum veröffentlichen.
-      // Das Element bleibt lokal stumm (muted), hören tut nur die Gegenseite.
-      const room = roomRef.current;
-      const audioEl = audioRef.current;
-      if (room && audioEl) {
-        const capture = (
-          audioEl as HTMLAudioElement & { captureStream?: () => MediaStream }
-        ).captureStream;
-        if (!capture) {
-          setLiveKitError(
-            "Dieser Browser unterstützt captureStream() nicht — keine LiveKit-Übertragung.",
-          );
-        } else if (!room.localParticipant.permissions?.canPublish) {
-          // Spectator: nur zuhören, nichts veröffentlichen
-        } else {
-          try {
-            const mediaStream = capture.call(audioEl);
-            const mediaTrack = mediaStream.getAudioTracks()[0];
-            if (mediaTrack) {
-              await room.localParticipant.publishTrack(mediaTrack, {
-                source: Track.Source.Unknown,
-              });
-              publishedTrackRef.current = mediaTrack;
-            }
-          } catch (err) {
-            console.error("LiveKit-Publish fehlgeschlagen:", err);
-            setLiveKitError(
-              err instanceof Error
-                ? err.message
-                : "LiveKit-Publish fehlgeschlagen",
-            );
-          }
-        }
-      }
 
       mediaSource.addEventListener("sourceopen", async () => {
         try {
@@ -282,11 +247,70 @@ function TranscribePage() {
             sourceBufferBusy = false;
             if (!started) {
               started = true;
+
+              // Erst nachdem der erste Chunk wirklich im SourceBuffer liegt:
+              // Eigene Übersetzung lokal abspielen ODER — falls eine LiveKit-
+              // Verbindung besteht — stumm an das <audio>-Element abgeben und
+              // per captureStream() an den Raum senden.
+              const room = roomRef.current;
+              const audioEl = audioRef.current;
+
+              if (room && audioEl) {
+                audioEl.muted = true;
+
+                const capture = (
+                  audioEl as HTMLAudioElement & {
+                    captureStream?: () => MediaStream;
+                  }
+                ).captureStream;
+
+                if (!capture) {
+                  setLiveKitError(
+                    "Dieser Browser unterstützt captureStream() nicht — keine LiveKit-Übertragung.",
+                  );
+                } else if (!room.localParticipant.permissions?.canPublish) {
+                  // Spectator: zuhören, aber nichts veröffentlichen
+                } else {
+                  try {
+                    const mediaStream = capture.call(audioEl);
+                    const mediaTrack = mediaStream.getAudioTracks()[0];
+                    if (mediaTrack) {
+                      // Sofort referenzieren, damit stop()/disconnect sie aufräumen kann,
+                      // auch wenn publishTrack noch nicht resolved ist.
+                      publishedTrackRef.current = mediaTrack;
+                      room.localParticipant
+                        .publishTrack(mediaTrack, {
+                          source: Track.Source.Unknown,
+                        })
+                        .catch((err) => {
+                          console.error("LiveKit-Publish fehlgeschlagen:", err);
+                          setLiveKitError(
+                            err instanceof Error
+                              ? err.message
+                              : "LiveKit-Publish fehlgeschlagen",
+                          );
+                        });
+                    }
+                  } catch (err) {
+                    console.error("LiveKit-Publish fehlgeschlagen:", err);
+                    setLiveKitError(
+                      err instanceof Error
+                        ? err.message
+                        : "LiveKit-Publish fehlgeschlagen",
+                    );
+                  }
+                }
+              } else if (audioEl) {
+                // Keine LiveKit-Verbindung: eigene Übersetzung normal lokal hören
+                audioEl.muted = false;
+              }
+
               audioRef.current?.play().catch((err) =>
                 console.error("Audio-Wiedergabe konnte nicht starten:", err),
               );
             }
             flushQueue();
+
             if (
               streamDone &&
               queue.length === 0 &&
@@ -1195,10 +1219,10 @@ function TranscribePage() {
           <audio
             ref={audioRef}
             controls
-            muted={useStreamingTts}
             src={streamUrl ?? undefined}
             className="w-full"
           />
+
 
           {/* Empfänger: hier landen eingehende LiveKit-Audiospuren der Gegenseite */}
           <audio ref={remoteAudioRef} className="hidden" />
