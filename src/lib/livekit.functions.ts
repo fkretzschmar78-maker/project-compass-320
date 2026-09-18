@@ -4,8 +4,9 @@ import { AccessToken } from "livekit-server-sdk";
 
 /**
  * Erzeugt einen LiveKit-Zugangs-Token für den angemeldeten Nutzer.
- * Alle Rollen (arzt/patient/spectator) dürfen dem Raum beitreten,
- * aber niemand darf Audio/Video veröffentlichen (nur Zuhören/Mitschreiben).
+ * Die Rolle wird wie immer serverseitig aus public.user_roles gelesen.
+ * Arzt und Patient dürfen Audio publizieren (später: Mikrofon),
+ * Zuhörer nur dem Raum beitreten und Streams empfangen.
  */
 export const getLiveKitToken = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -30,6 +31,8 @@ export const getLiveKitToken = createServerFn({ method: "GET" })
 
     const roomName = "medifluent";
 
+    const canPublish = data.role === "arzt" || data.role === "patient";
+
     const token = new AccessToken(apiKey, apiSecret, {
       identity: context.userId,
       name: context.userId,
@@ -38,7 +41,7 @@ export const getLiveKitToken = createServerFn({ method: "GET" })
     token.addGrant({
       roomJoin: true,
       room: roomName,
-      canPublish: false,
+      canPublish,
       canSubscribe: true,
     });
 
