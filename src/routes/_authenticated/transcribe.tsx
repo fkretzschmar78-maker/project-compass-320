@@ -388,6 +388,21 @@ function TranscribePage() {
         setLiveKitParticipantCount(room.numParticipants);
       });
 
+      // Empfänger-Seite: eingehende Audio-Spur der Gegenseite automatisch
+      // an ein <audio>-Element hängen und abspielen.
+      room.on(
+        RoomEvent.TrackSubscribed,
+        (track: RemoteTrack, _publication: RemoteTrackPublication) => {
+          if (track.kind !== Track.Kind.Audio) return;
+          const el = remoteAudioRef.current;
+          if (!el) return;
+          track.attach(el);
+          el.play().catch((err) =>
+            console.error("Remote-Audio konnte nicht starten:", err),
+          );
+        },
+      );
+
       await room.connect(result.url, result.token);
     } catch (err) {
       setLiveKitConnected(false);
@@ -398,6 +413,14 @@ function TranscribePage() {
   }
 
   function disconnectLiveKit() {
+    if (publishedTrackRef.current) {
+      try {
+        publishedTrackRef.current.stop();
+      } catch {
+        // ignore
+      }
+      publishedTrackRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
