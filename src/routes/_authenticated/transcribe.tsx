@@ -118,6 +118,8 @@ function TranscribePage() {
   const isPlayingRef = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const languagesReadyRef = useRef(false);
+  const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 
   function enqueueClips(clips: string[]) {
     audioQueueRef.current.push(clips);
@@ -500,7 +502,13 @@ function TranscribePage() {
             ws.send(buffer);
           }
         };
+        keepAliveIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "KeepAlive" }));
+          }
+        }, 5000);
       };
+
 
       ws.onmessage = (event) => {
         const raw = typeof event.data === "string" ? event.data : "";
@@ -665,10 +673,19 @@ function TranscribePage() {
       };
 
       ws.onerror = (event) => {
+        if (keepAliveIntervalRef.current) {
+          clearInterval(keepAliveIntervalRef.current);
+          keepAliveIntervalRef.current = null;
+        }
         console.error("WebSocket-Fehler", event);
       };
 
+
       ws.onclose = (event) => {
+        if (keepAliveIntervalRef.current) {
+          clearInterval(keepAliveIntervalRef.current);
+          keepAliveIntervalRef.current = null;
+        }
         const code = event.code;
         const reason = event.reason || "kein Grund angegeben";
         console.error("WebSocket geschlossen", { code, reason });
@@ -676,6 +693,7 @@ function TranscribePage() {
           `Verbindung zur Spracherkennung wurde unterbrochen (Code ${code}: ${reason})`,
         );
       };
+
     } catch (err) {
       setError(
         err instanceof Error
@@ -687,10 +705,16 @@ function TranscribePage() {
   }
 
   async function stop() {
+    if (keepAliveIntervalRef.current) {
+      clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+    }
+
     const ctx = audioCtxRef.current;
     const worklet = workletNodeRef.current;
     const stream = mediaStreamRef.current;
     const ws = wsRef.current;
+
 
     wsRef.current = null;
 
