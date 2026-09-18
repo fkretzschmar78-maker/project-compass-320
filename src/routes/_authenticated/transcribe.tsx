@@ -978,6 +978,7 @@ interface BroadcastSpeechPayload {
   segmentId: string;
   originalText: string;
   translatedText: string;
+  sentAt: number;
 }
 
 function AkteSection({ title, text }: { title: string; text: string }) {
