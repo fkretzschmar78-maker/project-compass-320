@@ -7,9 +7,11 @@ import { translateText } from "@/lib/translate.functions";
 import { synthesizeSpeech } from "@/lib/tts.functions";
 import { logConversationSegment } from "@/lib/conversation-log.functions";
 import { setMyLanguage, getSessionLanguages } from "@/lib/session-language.functions";
+import { getLiveKitToken } from "@/lib/livekit.functions";
 import { LANGUAGES, languageLabel } from "@/lib/languages";
 import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
+import { Room, RoomEvent } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
