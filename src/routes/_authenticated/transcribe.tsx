@@ -99,6 +99,10 @@ function TranscribePage() {
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
   const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
   const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
+  const [myLanguage, setMyLanguageState] = useState<LanguageCode | null>(null);
+  const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
+  const [languageLoading, setLanguageLoading] = useState(true);
+  const [languageSaving, setLanguageSaving] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
