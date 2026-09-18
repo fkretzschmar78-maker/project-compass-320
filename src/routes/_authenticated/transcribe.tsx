@@ -715,6 +715,8 @@ function TranscribePage() {
     audioCtxRef.current = null;
     workletNodeRef.current = null;
     mediaStreamRef.current = null;
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
     setIsRecording(false);
   }
 
@@ -853,6 +855,19 @@ function TranscribePage() {
               disabled={!myLanguage || !otherLanguage}
             >
               {isRecording ? "Live-Übersetzung beenden" : "Live-Übersetzung starten"}
+            </Button>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                audioQueueRef.current = [];
+                isPlayingRef.current = false;
+              }}
+            >
+              Warteschlange leeren
             </Button>
           </div>
 
