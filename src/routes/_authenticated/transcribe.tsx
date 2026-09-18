@@ -92,6 +92,8 @@ function TranscribePage() {
   const fetchTranslate = useServerFn(translateText);
   const fetchSynthesize = useServerFn(synthesizeSpeech);
   const fetchLogSegment = useServerFn(logConversationSegment);
+  const fetchSetMyLanguage = useServerFn(setMyLanguage);
+  const fetchSessionLanguages = useServerFn(getSessionLanguages);
 
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
