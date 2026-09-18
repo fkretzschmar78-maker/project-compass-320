@@ -115,6 +115,9 @@ function TranscribePage() {
   const [languageSaving, setLanguageSaving] = useState(false);
   const [useStreamingTts, setUseStreamingTts] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [liveKitConnected, setLiveKitConnected] = useState(false);
+  const [liveKitParticipantCount, setLiveKitParticipantCount] = useState(0);
+  const [liveKitError, setLiveKitError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
