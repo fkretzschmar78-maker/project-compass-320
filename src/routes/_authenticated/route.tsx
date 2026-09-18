@@ -69,7 +69,7 @@ function AuthenticatedLayout() {
               >
                 Übersicht
               </Link>
-              {(role === "arzt" || role === "patient") && (
+              {(role === "arzt" || role === "patient" || role === "spectator") && (
                 <Link
                   to="/transcribe"
                   className={cn(
