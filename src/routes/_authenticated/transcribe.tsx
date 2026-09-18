@@ -232,6 +232,48 @@ function TranscribePage() {
     };
   }, [role]);
 
+  useEffect(() => {
+    languagesReadyRef.current = !!(myLanguage && otherLanguage);
+  }, [myLanguage, otherLanguage]);
+
+  useEffect(() => {
+    if (role !== "arzt" && role !== "patient") return;
+
+    let mounted = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    async function loadLanguages() {
+      try {
+        const result = await fetchSessionLanguages({ data: undefined });
+        if (!mounted) return;
+        if (role === "arzt") {
+          setMyLanguageState(result.arzt);
+          setOtherLanguage(result.patient);
+        } else {
+          setMyLanguageState(result.patient);
+          setOtherLanguage(result.arzt);
+        }
+      } catch (err) {
+        console.error("Sprachen konnten nicht geladen werden", err);
+      } finally {
+        if (mounted) setLanguageLoading(false);
+      }
+    }
+
+    void loadLanguages();
+
+    intervalId = setInterval(() => {
+      if (!languagesReadyRef.current) {
+        void loadLanguages();
+      }
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [role]);
+
   if (roleLoading) {
     return (
       <main className="flex min-h-full items-center justify-center bg-app-background px-4 py-16">
