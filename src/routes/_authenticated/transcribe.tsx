@@ -11,7 +11,7 @@ import { getLiveKitToken } from "@/lib/livekit.functions";
 import { LANGUAGES, languageLabel } from "@/lib/languages";
 import type { LanguageCode } from "@/lib/languages";
 import { useRole } from "@/hooks/use-role";
-import { LocalAudioTrack, Room, RoomEvent, Track } from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 import type { RemoteTrack, RemoteTrackPublication } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,7 +133,7 @@ function TranscribePage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const roomRef = useRef<Room | null>(null);
   // Sender: aktuell über LiveKit veröffentlichte Audiospur aus dem <audio>-Element
-  const publishedTrackRef = useRef<LocalAudioTrack | null>(null);
+  const publishedTrackRef = useRef<MediaStreamTrack | null>(null);
   // Empfänger: <audio>-Element für eingehende LiveKit-Spuren der Gegenseite
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -241,11 +241,10 @@ function TranscribePage() {
             const mediaStream = capture.call(audioEl);
             const mediaTrack = mediaStream.getAudioTracks()[0];
             if (mediaTrack) {
-              const localTrack = new LocalAudioTrack(mediaTrack);
-              await room.localParticipant.publishTrack(localTrack, {
+              await room.localParticipant.publishTrack(mediaTrack, {
                 source: Track.Source.Unknown,
               });
-              publishedTrackRef.current = localTrack;
+              publishedTrackRef.current = mediaTrack;
             }
           } catch (err) {
             console.error("LiveKit-Publish fehlgeschlagen:", err);
