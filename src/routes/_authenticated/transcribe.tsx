@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/_authenticated/transcribe")({
@@ -109,6 +110,8 @@ function TranscribePage() {
   const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
   const [languageLoading, setLanguageLoading] = useState(true);
   const [languageSaving, setLanguageSaving] = useState(false);
+  const [useStreamingTts, setUseStreamingTts] = useState(false);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -119,6 +122,8 @@ function TranscribePage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const languagesReadyRef = useRef(false);
   const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamUrlRef = useRef<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
 
   function enqueueClips(clips: string[]) {
@@ -161,6 +166,134 @@ function TranscribePage() {
       };
       playNext();
     });
+  }
+
+  async function streamTts(text: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Keine Sitzung");
+
+      const mimeType = "audio/mpeg";
+      if (!MediaSource.isTypeSupported(mimeType)) {
+        throw new Error(`MediaSource unterstützt ${mimeType} in diesem Browser nicht`);
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      }
+
+      if (streamUrlRef.current) {
+        URL.revokeObjectURL(streamUrlRef.current);
+        streamUrlRef.current = null;
+        setStreamUrl(null);
+      }
+
+      const mediaSource = new MediaSource();
+      const objectUrl = URL.createObjectURL(mediaSource);
+      streamUrlRef.current = objectUrl;
+      setStreamUrl(objectUrl);
+
+      mediaSource.addEventListener("sourceopen", async () => {
+        try {
+          const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+          const queue: Uint8Array[] = [];
+          let started = false;
+          let sourceBufferBusy = false;
+          let streamDone = false;
+
+          const flushQueue = () => {
+            if (sourceBufferBusy || queue.length === 0) return;
+            const chunk = queue.shift()!;
+            try {
+              sourceBufferBusy = true;
+              sourceBuffer.appendBuffer(chunk.buffer as ArrayBuffer);
+            } catch (err) {
+              console.error("appendBuffer-Fehler", err);
+              sourceBufferBusy = false;
+              flushQueue();
+            }
+          };
+
+          sourceBuffer.addEventListener("updateend", () => {
+            sourceBufferBusy = false;
+            if (!started) {
+              started = true;
+              audioRef.current?.play().catch((err) =>
+                console.error("Audio-Wiedergabe konnte nicht starten:", err),
+              );
+            }
+            flushQueue();
+            if (
+              streamDone &&
+              queue.length === 0 &&
+              !sourceBufferBusy &&
+              mediaSource.readyState === "open"
+            ) {
+              try {
+                mediaSource.endOfStream();
+              } catch {
+                // ignore
+              }
+            }
+          });
+
+          sourceBuffer.addEventListener("error", (err) => {
+            console.error("SourceBuffer-Fehler", err);
+          });
+
+          const res = await fetch("/api/synthesize-stream", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text }),
+          });
+          if (!res.ok) throw new Error(`Stream-TTS fehlgeschlagen: ${res.status}`);
+          if (!res.body) throw new Error("Kein Response-Body");
+
+          const reader = res.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              streamDone = true;
+              if (
+                queue.length === 0 &&
+                !sourceBufferBusy &&
+                mediaSource.readyState === "open"
+              ) {
+                try {
+                  mediaSource.endOfStream();
+                } catch {
+                  // ignore
+                }
+              }
+              break;
+            }
+            queue.push(value);
+            flushQueue();
+          }
+        } catch (err) {
+          console.error("MediaSource-Fehler:", err);
+          if (mediaSource.readyState === "open") {
+            try {
+              mediaSource.endOfStream();
+            } catch {
+              // ignore
+            }
+          }
+        }
+      });
+
+      mediaSource.addEventListener("error", (err) => {
+        console.error("MediaSource-Fehler", err);
+      });
+    } catch (err) {
+      console.error("Stream-TTS-Fehler:", err);
+    }
   }
 
   useEffect(() => {
@@ -567,51 +700,67 @@ function TranscribePage() {
                         console.error("Protokollierung fehlgeschlagen:", err),
                       );
                     }
-                    fetchSynthesize({ data: { text: result.translation } })
-                      .then((synthResult) => {
-                        const ttsReceivedAt = Date.now();
-                        setTranscripts((prev) =>
-                          prev.map((item) =>
-                            item.id === id
-                              ? {
-                                  ...item,
-                                  audioClips: synthResult.clips,
-                                  synthesizing: false,
-                                  ttsReceivedAt,
-                                }
-                              : item
-                          )
-                        );
-                        const channel = channelRef.current;
-                        if (channel) {
-                          void channel.send({
-                            type: "broadcast",
-                            event: "speech",
-                            payload: {
-                              clips: synthResult.clips,
-                              fromRole: role,
-                              segmentId: id,
-                              originalText: transcript,
-                              translatedText: result.translation,
-                              sentAt: Date.now(),
-                            } as BroadcastSpeechPayload,
-                          });
-                        }
-                      })
-                      .catch((err) => {
-                        console.error("Sprachausgabe fehlgeschlagen:", err);
-                        setTranscripts((prev) =>
-                          prev.map((item) =>
-                            item.id === id
-                              ? {
-                                  ...item,
-                                  synthesisError: "Sprachausgabe fehlgeschlagen",
-                                  synthesizing: false,
-                                }
-                              : item
-                          )
-                        );
-                      });
+                    if (useStreamingTts) {
+                      const ttsReceivedAt = Date.now();
+                      setTranscripts((prev) =>
+                        prev.map((item) =>
+                          item.id === id
+                            ? {
+                                ...item,
+                                synthesizing: false,
+                                ttsReceivedAt,
+                              }
+                            : item
+                        )
+                      );
+                      void streamTts(result.translation);
+                    } else {
+                      fetchSynthesize({ data: { text: result.translation } })
+                        .then((synthResult) => {
+                          const ttsReceivedAt = Date.now();
+                          setTranscripts((prev) =>
+                            prev.map((item) =>
+                              item.id === id
+                                ? {
+                                    ...item,
+                                    audioClips: synthResult.clips,
+                                    synthesizing: false,
+                                    ttsReceivedAt,
+                                  }
+                                : item
+                            )
+                          );
+                          const channel = channelRef.current;
+                          if (channel) {
+                            void channel.send({
+                              type: "broadcast",
+                              event: "speech",
+                              payload: {
+                                clips: synthResult.clips,
+                                fromRole: role,
+                                segmentId: id,
+                                originalText: transcript,
+                                translatedText: result.translation,
+                                sentAt: Date.now(),
+                              } as BroadcastSpeechPayload,
+                            });
+                          }
+                        })
+                        .catch((err) => {
+                          console.error("Sprachausgabe fehlgeschlagen:", err);
+                          setTranscripts((prev) =>
+                            prev.map((item) =>
+                              item.id === id
+                                ? {
+                                    ...item,
+                                    synthesisError: "Sprachausgabe fehlgeschlagen",
+                                    synthesizing: false,
+                                  }
+                                : item
+                            )
+                          );
+                        });
+                    }
                     // Rückübersetzung läuft parallel und blockiert TTS/Broadcast nicht.
                     fetchTranslate({ data: { text: result.translation, direction: "back" } })
                       .then((backResult) => {
@@ -713,6 +862,22 @@ function TranscribePage() {
     if (keepAliveIntervalRef.current) {
       clearInterval(keepAliveIntervalRef.current);
       keepAliveIntervalRef.current = null;
+    }
+
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (streamUrlRef.current) {
+      URL.revokeObjectURL(streamUrlRef.current);
+      streamUrlRef.current = null;
+      setStreamUrl(null);
     }
 
     const ctx = audioCtxRef.current;
@@ -863,6 +1028,43 @@ function TranscribePage() {
               </p>
             )}
           </div>
+
+          <div className="rounded-md border bg-muted/40 p-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-[13px] font-medium text-app-text">
+                  Streaming-TTS testen (nur lokal)
+                </p>
+                <p className="text-[13px] text-muted-foreground">
+                  Spielt die Übersetzung progressiv direkt im Browser ab.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useStreamingTts}
+                onClick={() => setUseStreamingTts((prev) => !prev)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-control-accent",
+                  useStreamingTts ? "bg-translation-accent" : "bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    useStreamingTts ? "translate-x-6" : "translate-x-1",
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          <audio
+            ref={audioRef}
+            controls
+            src={streamUrl ?? undefined}
+            className="w-full"
+          />
 
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
