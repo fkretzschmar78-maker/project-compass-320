@@ -836,6 +836,12 @@ function TranscribePage() {
             <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
             </p>
+            {lastBroadcastLatency !== null && (
+              <p className="text-[13px] text-muted-foreground">
+                Letzte Antwort kam nach{" "}
+                {lastBroadcastLatency.toFixed(1).replace(".", ",")}s an
+              </p>
+            )}
             {receivedSegments.length > 0 && (
               <ul className="mt-1 space-y-0.5">
                 {receivedSegments.map((id) => (
