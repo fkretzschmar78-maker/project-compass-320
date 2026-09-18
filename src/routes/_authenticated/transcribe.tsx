@@ -176,6 +176,9 @@ function TranscribePage() {
         { event: "speech" },
         (message: { payload?: BroadcastSpeechPayload }) => {
           const payload = message.payload;
+          if (payload?.segmentId) {
+            console.log(`[Latenz][${payload.segmentId}] Broadcast received: ${Date.now()}`);
+          }
           if (!payload || !Array.isArray(payload.clips)) return;
 
           if (role === "spectator") {
@@ -501,6 +504,7 @@ function TranscribePage() {
           if (!transcript) return;
           if (msg.is_final) {
             const id = crypto.randomUUID();
+            console.log(`[Latenz][${id}] Segment final: ${Date.now()}`);
             setTranscripts((prev) => {
               const last = prev[prev.length - 1];
               if (last && !last.isFinal) {
@@ -521,6 +525,7 @@ function TranscribePage() {
             }
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
+                console.log(`[Latenz][${id}] Translation received: ${Date.now()}`);
                     setTranscripts((prev) =>
                       prev.map((item) =>
                         item.id === id
@@ -543,6 +548,7 @@ function TranscribePage() {
                     }
                     fetchSynthesize({ data: { text: result.translation } })
                       .then((synthResult) => {
+                        console.log(`[Latenz][${id}] TTS received: ${Date.now()}`);
                         setTranscripts((prev) =>
                           prev.map((item) =>
                             item.id === id
@@ -556,6 +562,7 @@ function TranscribePage() {
                         );
                         const channel = channelRef.current;
                         if (channel) {
+                          console.log(`[Latenz][${id}] Broadcast sending: ${Date.now()}`);
                           void channel.send({
                             type: "broadcast",
                             event: "speech",
