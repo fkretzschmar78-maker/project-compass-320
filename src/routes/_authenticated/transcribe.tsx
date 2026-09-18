@@ -505,6 +505,7 @@ function TranscribePage() {
       ws.onmessage = (event) => {
         const raw = typeof event.data === "string" ? event.data : "";
         const msg = JSON.parse(raw) as DeepgramMessage;
+        console.log(`[DG] ${Date.now()} type=${msg.type}`, msg);
         if (msg.type === "Results") {
           const transcript = msg.channel?.alternatives?.[0]?.transcript ?? "";
           if (!transcript) return;
