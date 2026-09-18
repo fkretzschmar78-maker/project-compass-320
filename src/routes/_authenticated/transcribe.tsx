@@ -303,9 +303,58 @@ function TranscribePage() {
     }
   }
 
+  async function connectLiveKit() {
+    try {
+      setLiveKitError(null);
+      const result = await fetchLiveKitToken();
+      if (!result.token || !result.url) {
+        throw new Error("Kein LiveKit-Token erhalten");
+      }
+
+      const room = new Room();
+      roomRef.current = room;
+
+      room.on(RoomEvent.Connected, () => {
+        setLiveKitConnected(true);
+        setLiveKitParticipantCount(room.numParticipants);
+        setLiveKitError(null);
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        setLiveKitConnected(false);
+        setLiveKitParticipantCount(0);
+      });
+
+      room.on(RoomEvent.ParticipantConnected, () => {
+        setLiveKitParticipantCount(room.numParticipants);
+      });
+
+      room.on(RoomEvent.ParticipantDisconnected, () => {
+        setLiveKitParticipantCount(room.numParticipants);
+      });
+
+      await room.connect(result.url, result.token);
+    } catch (err) {
+      setLiveKitConnected(false);
+      setLiveKitError(
+        err instanceof Error ? err.message : "LiveKit-Verbindung fehlgeschlagen",
+      );
+    }
+  }
+
+  function disconnectLiveKit() {
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+    setLiveKitConnected(false);
+    setLiveKitParticipantCount(0);
+  }
+
   useEffect(() => {
     return () => {
       void stop();
+      void disconnectLiveKit();
     };
   }, []);
 
