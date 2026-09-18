@@ -553,7 +553,7 @@ function TranscribePage() {
                     }
                     fetchSynthesize({ data: { text: result.translation } })
                       .then((synthResult) => {
-                        console.log(`[Latenz][${id}] TTS received: ${Date.now()}`);
+                        const ttsReceivedAt = Date.now();
                         setTranscripts((prev) =>
                           prev.map((item) =>
                             item.id === id
@@ -561,6 +561,7 @@ function TranscribePage() {
                                   ...item,
                                   audioClips: synthResult.clips,
                                   synthesizing: false,
+                                  ttsReceivedAt,
                                 }
                               : item
                           )
