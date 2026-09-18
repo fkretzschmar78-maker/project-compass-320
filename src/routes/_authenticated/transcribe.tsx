@@ -847,6 +847,7 @@ function TranscribePage() {
             <Button
               onClick={isRecording ? stop : start}
               variant={isRecording ? "destructive" : "default"}
+              disabled={!myLanguage || !otherLanguage}
             >
               {isRecording ? "Live-Übersetzung beenden" : "Live-Übersetzung starten"}
             </Button>
