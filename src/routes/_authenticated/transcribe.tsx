@@ -753,6 +753,67 @@ function TranscribePage() {
             </span>
           </p>
 
+          <div className="space-y-3 rounded-md border bg-muted/40 p-4">
+            <label
+              htmlFor="language-select"
+              className="text-sm font-medium text-app-text"
+            >
+              Ihre Sprache
+            </label>
+            <Select
+              value={myLanguage ?? ""}
+              onValueChange={(value) =>
+                handleLanguageChange(value as LanguageCode)
+              }
+              disabled={languageLoading || languageSaving || isRecording}
+            >
+              <SelectTrigger
+                id="language-select"
+                className="w-full bg-app-background"
+              >
+                <SelectValue placeholder="Sprache auswählen …" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {languageLoading && (
+              <p className="text-[13px] text-muted-foreground">
+                Sprache wird geladen …
+              </p>
+            )}
+
+            {!myLanguage && !languageLoading && (
+              <p className="text-[13px] text-destructive">
+                Bitte wählen Sie zuerst Ihre Sprache aus, bevor Sie die
+                Live-Übersetzung starten.
+              </p>
+            )}
+
+            {myLanguage && !otherLanguage && !languageLoading && (
+              <p className="text-[13px] text-destructive">
+                Warten auf die Sprachwahl der Gegenseite, bevor die
+                Live-Übersetzung starten kann.
+              </p>
+            )}
+
+            {myLanguage && (
+              <p className="text-[13px] text-muted-foreground">
+                Gegenseite:{" "}
+                <span className="font-medium text-app-text">
+                  {otherLanguage
+                    ? languageLabel(otherLanguage)
+                    : "noch nicht gewählt"}
+                </span>
+              </p>
+            )}
+          </div>
+
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
