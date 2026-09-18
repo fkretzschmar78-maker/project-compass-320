@@ -111,6 +111,7 @@ function TranscribePage() {
   const audioQueueRef = useRef<string[][]>([]);
   const isPlayingRef = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const languagesReadyRef = useRef(false);
 
   function enqueueClips(clips: string[]) {
     audioQueueRef.current.push(clips);
