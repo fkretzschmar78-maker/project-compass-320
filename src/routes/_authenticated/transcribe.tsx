@@ -1196,9 +1196,13 @@ function TranscribePage() {
           <audio
             ref={audioRef}
             controls
+            muted={useStreamingTts}
             src={streamUrl ?? undefined}
             className="w-full"
           />
+
+          {/* Empfänger: hier landen eingehende LiveKit-Audiospuren der Gegenseite */}
+          <audio ref={remoteAudioRef} className="hidden" />
 
           <div className="rounded-md border bg-muted/40 p-3">
             <p className="text-[13px] font-medium text-muted-foreground">
