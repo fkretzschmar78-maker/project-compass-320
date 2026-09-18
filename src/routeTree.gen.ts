@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAkteRouteImport } from './routes/_authenticated/akte'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedTranscribeRouteImport } from './routes/_authenticated/transcribe'
+import { Route as ApiSynthesizeStreamRouteImport } from './routes/api/synthesize-stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +46,11 @@ const AuthenticatedTranscribeRoute = AuthenticatedTranscribeRouteImport.update({
   path: '/transcribe',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiSynthesizeStreamRoute = ApiSynthesizeStreamRouteImport.update({
+  id: '/api/synthesize-stream',
+  path: '/api/synthesize-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/akte': typeof AuthenticatedAkteRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/transcribe': typeof AuthenticatedTranscribeRoute
+  '/api/synthesize-stream': typeof ApiSynthesizeStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/akte': typeof AuthenticatedAkteRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/transcribe': typeof AuthenticatedTranscribeRoute
+  '/api/synthesize-stream': typeof ApiSynthesizeStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +76,25 @@ export interface FileRoutesById {
   '/_authenticated/akte': typeof AuthenticatedAkteRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/transcribe': typeof AuthenticatedTranscribeRoute
+  '/api/synthesize-stream': typeof ApiSynthesizeStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/akte' | '/dashboard' | '/transcribe'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/akte'
+    | '/dashboard'
+    | '/transcribe'
+    | '/api/synthesize-stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/akte' | '/dashboard' | '/transcribe'
+  to:
+    | '/'
+    | '/auth'
+    | '/akte'
+    | '/dashboard'
+    | '/transcribe'
+    | '/api/synthesize-stream'
   id:
     | '__root__'
     | '/'
@@ -82,12 +103,14 @@ export interface FileRouteTypes {
     | '/_authenticated/akte'
     | '/_authenticated/dashboard'
     | '/_authenticated/transcribe'
+    | '/api/synthesize-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiSynthesizeStreamRoute: typeof ApiSynthesizeStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTranscribeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/synthesize-stream': {
+      id: '/api/synthesize-stream'
+      path: '/api/synthesize-stream'
+      fullPath: '/api/synthesize-stream'
+      preLoaderRoute: typeof ApiSynthesizeStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -156,6 +186,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiSynthesizeStreamRoute: ApiSynthesizeStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
