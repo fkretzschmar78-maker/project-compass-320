@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { getDeepgramToken } from "@/lib/deepgram.functions";
 import { translateText } from "@/lib/translate.functions";
-import { synthesizeSpeech } from "@/lib/tts.functions";
 import { logConversationSegment } from "@/lib/conversation-log.functions";
 import { setMyLanguage, getSessionLanguages } from "@/lib/session-language.functions";
 import { getLiveKitToken } from "@/lib/livekit.functions";
@@ -28,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/_authenticated/transcribe")({
@@ -76,20 +74,12 @@ interface TranscriptItem {
   backTranslation?: string;
   backTranslating?: boolean;
   backTranslationError?: string;
-  audioClips?: string[];
   synthesizing?: boolean;
-  synthesisError?: string;
   finalAt?: number;
   translationReceivedAt?: number;
   ttsReceivedAt?: number;
 }
 
-interface LiveSegment {
-  id: string;
-  fromRole: "arzt" | "patient";
-  originalText: string;
-  translatedText: string;
-}
 
 interface ReleasedAkte {
   anamnese: string;
@@ -102,7 +92,6 @@ function TranscribePage() {
   const { data: roleData, isLoading: roleLoading } = useRole();
   const role = roleData?.role;
   const fetchTranslate = useServerFn(translateText);
-  const fetchSynthesize = useServerFn(synthesizeSpeech);
   const fetchLogSegment = useServerFn(logConversationSegment);
   const fetchSetMyLanguage = useServerFn(setMyLanguage);
   const fetchSessionLanguages = useServerFn(getSessionLanguages);
@@ -111,15 +100,11 @@ function TranscribePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
-  const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
-  const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
   const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
-  const [lastBroadcastLatency, setLastBroadcastLatency] = useState<number | null>(null);
   const [myLanguage, setMyLanguageState] = useState<LanguageCode | null>(null);
   const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
   const [languageLoading, setLanguageLoading] = useState(true);
   const [languageSaving, setLanguageSaving] = useState(false);
-  const [useStreamingTts, setUseStreamingTts] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [liveKitConnected, setLiveKitConnected] = useState(false);
   const [liveKitParticipantCount, setLiveKitParticipantCount] = useState(0);
@@ -138,8 +123,6 @@ function TranscribePage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioQueueRef = useRef<string[][]>([]);
-  const isPlayingRef = useRef(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const languagesReadyRef = useRef(false);
   const keepAliveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -151,48 +134,6 @@ function TranscribePage() {
   // Empfänger: <audio>-Element für eingehende LiveKit-Spuren der Gegenseite
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
-
-  function enqueueClips(clips: string[]) {
-    audioQueueRef.current.push(clips);
-    void processQueue();
-  }
-
-  async function processQueue() {
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
-    isPlayingRef.current = true;
-    const clips = audioQueueRef.current.shift()!;
-    await playClipArray(clips);
-    isPlayingRef.current = false;
-    void processQueue();
-  }
-
-  function playClipArray(clips: string[]): Promise<void> {
-    return new Promise((resolve) => {
-      let index = 0;
-      const playNext = () => {
-        if (index >= clips.length) {
-          resolve();
-          return;
-        }
-        const audio = new Audio(`data:audio/mp3;base64,${clips[index]}`);
-        audio.onended = () => {
-          index++;
-          playNext();
-        };
-        audio.onerror = () => {
-          console.error("Audio-Wiedergabe-Fehler");
-          index++;
-          playNext();
-        };
-        audio.play().catch((err) => {
-          console.error("Audio.play() abgelehnt:", err);
-          index++;
-          playNext();
-        });
-      };
-      playNext();
-    });
-  }
 
   async function streamTts(text: string) {
     try {
@@ -498,46 +439,6 @@ function TranscribePage() {
     channel
       .on(
         "broadcast",
-        { event: "speech" },
-        (message: { payload?: BroadcastSpeechPayload }) => {
-          const payload = message.payload;
-          if (!payload || !Array.isArray(payload.clips)) return;
-
-          if (role === "spectator") {
-            if (payload.clips.length > 0) {
-              const segmentId = payload.segmentId || "unknown";
-              setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
-              enqueueClips(payload.clips);
-            }
-            if (payload.originalText && payload.translatedText) {
-              setLiveSegments((prev) => [
-                ...prev,
-                {
-                  id: payload.segmentId || crypto.randomUUID(),
-                  fromRole: payload.fromRole,
-                  originalText: payload.originalText,
-                  translatedText: payload.translatedText,
-                },
-              ]);
-            }
-            return;
-          }
-
-          if (
-            payload.clips.length > 0 &&
-            payload.fromRole === OTHER_ROLE[role]
-          ) {
-            const segmentId = payload.segmentId || "unknown";
-            setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
-            enqueueClips(payload.clips);
-            if (typeof payload.sentAt === "number") {
-              setLastBroadcastLatency((Date.now() - payload.sentAt) / 1000);
-            }
-          }
-        },
-      )
-      .on(
-        "broadcast",
         { event: "akte-freigegeben" },
         (message: { payload?: ReleasedAkte }) => {
           const payload = message.payload;
@@ -666,31 +567,6 @@ function TranscribePage() {
               </Card>
             )}
 
-            <div className="rounded-md border bg-muted/40 p-4">
-              <p className="mb-2 text-sm font-medium text-app-text">
-                Empfangene Segmente
-              </p>
-              <div className="space-y-6">
-                {liveSegments.map((seg, i) => (
-                  <div key={seg.id ?? i} className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {ROLE_LABEL[seg.fromRole]}
-                    </p>
-                    <p className="text-xl font-medium text-app-text">
-                      {seg.originalText}
-                    </p>
-                    <p className="border-l-4 border-translation-accent pl-3 text-lg text-translation-accent">
-                      {seg.translatedText}
-                    </p>
-                  </div>
-                ))}
-                {liveSegments.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Noch keine Segmente empfangen.
-                  </p>
-                )}
-              </div>
-            </div>
 
             <Button asChild variant="outline" className="w-full">
               <Link to="/dashboard">Zurück zur Übersicht</Link>
@@ -886,67 +762,19 @@ function TranscribePage() {
                         console.error("Protokollierung fehlgeschlagen:", err),
                       );
                     }
-                    if (useStreamingTts) {
-                      const ttsReceivedAt = Date.now();
-                      setTranscripts((prev) =>
-                        prev.map((item) =>
-                          item.id === id
-                            ? {
-                                ...item,
-                                synthesizing: false,
-                                ttsReceivedAt,
-                              }
-                            : item
-                        )
-                      );
-                      void streamTts(result.translation);
-                    } else {
-                      fetchSynthesize({ data: { text: result.translation } })
-                        .then((synthResult) => {
-                          const ttsReceivedAt = Date.now();
-                          setTranscripts((prev) =>
-                            prev.map((item) =>
-                              item.id === id
-                                ? {
-                                    ...item,
-                                    audioClips: synthResult.clips,
-                                    synthesizing: false,
-                                    ttsReceivedAt,
-                                  }
-                                : item
-                            )
-                          );
-                          const channel = channelRef.current;
-                          if (channel) {
-                            void channel.send({
-                              type: "broadcast",
-                              event: "speech",
-                              payload: {
-                                clips: synthResult.clips,
-                                fromRole: role,
-                                segmentId: id,
-                                originalText: transcript,
-                                translatedText: result.translation,
-                                sentAt: Date.now(),
-                              } as BroadcastSpeechPayload,
-                            });
-                          }
-                        })
-                        .catch((err) => {
-                          console.error("Sprachausgabe fehlgeschlagen:", err);
-                          setTranscripts((prev) =>
-                            prev.map((item) =>
-                              item.id === id
-                                ? {
-                                    ...item,
-                                    synthesisError: "Sprachausgabe fehlgeschlagen",
-                                    synthesizing: false,
-                                  }
-                                : item
-                            )
-                          );
-                        });
-                    }
+                    const ttsReceivedAt = Date.now();
+                    setTranscripts((prev) =>
+                      prev.map((item) =>
+                        item.id === id
+                          ? {
+                              ...item,
+                              synthesizing: false,
+                              ttsReceivedAt,
+                            }
+                          : item
+                      )
+                    );
+                    void streamTts(result.translation);
                     // Rückübersetzung läuft parallel und blockiert TTS/Broadcast nicht.
                     fetchTranslate({ data: { text: result.translation, direction: "back" } })
                       .then((backResult) => {
@@ -1111,8 +939,6 @@ function TranscribePage() {
     audioCtxRef.current = null;
     workletNodeRef.current = null;
     mediaStreamRef.current = null;
-    audioQueueRef.current = [];
-    isPlayingRef.current = false;
     setIsRecording(false);
   }
 
@@ -1215,35 +1041,6 @@ function TranscribePage() {
             )}
           </div>
 
-          <div className="rounded-md border bg-muted/40 p-3">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-[13px] font-medium text-app-text">
-                  Streaming-TTS testen (nur lokal)
-                </p>
-                <p className="text-[13px] text-muted-foreground">
-                  Spielt die Übersetzung progressiv direkt im Browser ab.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={useStreamingTts}
-                onClick={() => setUseStreamingTts((prev) => !prev)}
-                className={cn(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-control-accent",
-                  useStreamingTts ? "bg-translation-accent" : "bg-muted",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                    useStreamingTts ? "translate-x-6" : "translate-x-1",
-                  )}
-                />
-              </button>
-            </div>
-          </div>
 
           <audio
             ref={audioRef}
@@ -1256,35 +1053,6 @@ function TranscribePage() {
           {/* Empfänger: hier landen eingehende LiveKit-Audiospuren der Gegenseite */}
           <audio ref={remoteAudioRef} className="hidden" />
 
-          <div className="rounded-md border bg-muted/40 p-3">
-            <p className="text-[13px] font-medium text-muted-foreground">
-              Empfangene Audiosegmente: {receivedSegments.length}
-            </p>
-            {lastBroadcastLatency !== null && (
-              <p className="text-[13px] text-muted-foreground">
-                Letzte Antwort kam nach{" "}
-                {lastBroadcastLatency.toFixed(1).replace(".", ",")}s an
-              </p>
-            )}
-            {receivedSegments.length > 0 && (
-              <ul className="mt-1 space-y-0.5">
-                {receivedSegments.map((id) => (
-                  <li
-                    key={id}
-                    className="truncate text-[13px] font-mono text-muted-foreground"
-                    title={id}
-                  >
-                    {id}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {receivedSegments.length === 0 && (
-              <p className="text-[13px] text-muted-foreground">
-                Noch keine empfangen.
-              </p>
-            )}
-          </div>
 
           <div className="rounded-md border bg-muted/40 p-3">
             <div className="flex items-center justify-between gap-4">
@@ -1351,18 +1119,6 @@ function TranscribePage() {
             </Button>
           </div>
 
-          <div className="flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                audioQueueRef.current = [];
-                isPlayingRef.current = false;
-              }}
-            >
-              Warteschlange leeren
-            </Button>
-          </div>
 
           {error && (
             <p className="text-center text-sm text-destructive">{error}</p>
@@ -1435,11 +1191,6 @@ function TranscribePage() {
                       Sprachausgabe wird erstellt …
                     </span>
                   )}
-                  {t.synthesisError && (
-                    <span className="block text-[13px] text-destructive">
-                      {t.synthesisError}
-                    </span>
-                  )}
                 </div>
               ))}
               {transcripts.length === 0 && !isRecording && (
@@ -1473,14 +1224,6 @@ interface DeepgramMessage {
   channel?: DeepgramChannel;
 }
 
-interface BroadcastSpeechPayload {
-  clips: string[];
-  fromRole: "arzt" | "patient";
-  segmentId: string;
-  originalText: string;
-  translatedText: string;
-  sentAt: number;
-}
 
 function AkteSection({ title, text }: { title: string; text: string }) {
   return (
