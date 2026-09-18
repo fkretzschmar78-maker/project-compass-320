@@ -70,6 +70,9 @@ interface TranscriptItem {
   audioClips?: string[];
   synthesizing?: boolean;
   synthesisError?: string;
+  finalAt?: number;
+  translationReceivedAt?: number;
+  ttsReceivedAt?: number;
 }
 
 interface LiveSegment {
@@ -101,6 +104,7 @@ function TranscribePage() {
   const [receivedSegments, setReceivedSegments] = useState<string[]>([]);
   const [liveSegments, setLiveSegments] = useState<LiveSegment[]>([]);
   const [releasedAkte, setReleasedAkte] = useState<ReleasedAkte | null>(null);
+  const [lastBroadcastLatency, setLastBroadcastLatency] = useState<number | null>(null);
   const [myLanguage, setMyLanguageState] = useState<LanguageCode | null>(null);
   const [otherLanguage, setOtherLanguage] = useState<LanguageCode | null>(null);
   const [languageLoading, setLanguageLoading] = useState(true);
@@ -176,9 +180,6 @@ function TranscribePage() {
         { event: "speech" },
         (message: { payload?: BroadcastSpeechPayload }) => {
           const payload = message.payload;
-          if (payload?.segmentId) {
-            console.log(`[Latenz][${payload.segmentId}] Broadcast received: ${Date.now()}`);
-          }
           if (!payload || !Array.isArray(payload.clips)) return;
 
           if (role === "spectator") {
@@ -208,6 +209,9 @@ function TranscribePage() {
             const segmentId = payload.segmentId || "unknown";
             setReceivedSegments((prev) => [...prev.slice(-2), segmentId]);
             enqueueClips(payload.clips);
+            if (typeof payload.sentAt === "number") {
+              setLastBroadcastLatency((Date.now() - payload.sentAt) / 1000);
+            }
           }
         },
       )
@@ -504,18 +508,18 @@ function TranscribePage() {
           if (!transcript) return;
           if (msg.is_final) {
             const id = crypto.randomUUID();
-            console.log(`[Latenz][${id}] Segment final: ${Date.now()}`);
+            const finalAt = Date.now();
             setTranscripts((prev) => {
               const last = prev[prev.length - 1];
               if (last && !last.isFinal) {
                 return [
                   ...prev.slice(0, -1),
-                  { id, text: transcript, isFinal: true, translating: true },
+                  { id, text: transcript, isFinal: true, translating: true, finalAt },
                 ];
               }
               return [
                 ...prev,
-                { id, text: transcript, isFinal: true, translating: true },
+                { id, text: transcript, isFinal: true, translating: true, finalAt },
               ];
             });
             if (role === "patient") {
@@ -525,20 +529,21 @@ function TranscribePage() {
             }
             fetchTranslate({ data: { text: transcript } })
               .then((result) => {
-                console.log(`[Latenz][${id}] Translation received: ${Date.now()}`);
-                    setTranscripts((prev) =>
-                      prev.map((item) =>
-                        item.id === id
-                          ? {
-                              ...item,
-                              translation: result.translation,
-                              translating: false,
-                              synthesizing: true,
-                              backTranslating: true,
-                            }
-                          : item
-                      )
-                    );
+                const translationReceivedAt = Date.now();
+                setTranscripts((prev) =>
+                  prev.map((item) =>
+                    item.id === id
+                      ? {
+                          ...item,
+                          translation: result.translation,
+                          translating: false,
+                          synthesizing: true,
+                          backTranslating: true,
+                          translationReceivedAt,
+                        }
+                      : item
+                  )
+                );
                     if (role === "arzt") {
                       void fetchLogSegment({
                         data: { text: result.translation },
@@ -548,7 +553,7 @@ function TranscribePage() {
                     }
                     fetchSynthesize({ data: { text: result.translation } })
                       .then((synthResult) => {
-                        console.log(`[Latenz][${id}] TTS received: ${Date.now()}`);
+                        const ttsReceivedAt = Date.now();
                         setTranscripts((prev) =>
                           prev.map((item) =>
                             item.id === id
@@ -556,13 +561,13 @@ function TranscribePage() {
                                   ...item,
                                   audioClips: synthResult.clips,
                                   synthesizing: false,
+                                  ttsReceivedAt,
                                 }
                               : item
                           )
                         );
                         const channel = channelRef.current;
                         if (channel) {
-                          console.log(`[Latenz][${id}] Broadcast sending: ${Date.now()}`);
                           void channel.send({
                             type: "broadcast",
                             event: "speech",
@@ -572,6 +577,7 @@ function TranscribePage() {
                               segmentId: id,
                               originalText: transcript,
                               translatedText: result.translation,
+                              sentAt: Date.now(),
                             } as BroadcastSpeechPayload,
                           });
                         }
@@ -830,6 +836,12 @@ function TranscribePage() {
             <p className="text-[13px] font-medium text-muted-foreground">
               Empfangene Audiosegmente: {receivedSegments.length}
             </p>
+            {lastBroadcastLatency !== null && (
+              <p className="text-[13px] text-muted-foreground">
+                Letzte Antwort kam nach{" "}
+                {lastBroadcastLatency.toFixed(1).replace(".", ",")}s an
+              </p>
+            )}
             {receivedSegments.length > 0 && (
               <ul className="mt-1 space-y-0.5">
                 {receivedSegments.map((id) => (
@@ -925,6 +937,25 @@ function TranscribePage() {
                       Rückübersetzung zur Kontrolle: {t.backTranslation}
                     </p>
                   )}
+                  {t.finalAt && (
+                    <p className="text-[13px] text-muted-foreground">
+                      {[
+                        t.translationReceivedAt &&
+                          `Übersetzung: ${(
+                            (t.translationReceivedAt - t.finalAt) /
+                            1000
+                          ).toFixed(1).replace(".", ",")}s`,
+                        t.ttsReceivedAt &&
+                          t.translationReceivedAt &&
+                          `Sprachausgabe: ${(
+                            (t.ttsReceivedAt - t.translationReceivedAt) /
+                            1000
+                          ).toFixed(1).replace(".", ",")}s`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   {t.synthesizing && (
                     <span className="block text-[13px] text-muted-foreground">
                       Sprachausgabe wird erstellt …
@@ -974,6 +1005,7 @@ interface BroadcastSpeechPayload {
   segmentId: string;
   originalText: string;
   translatedText: string;
+  sentAt: number;
 }
 
 function AkteSection({ title, text }: { title: string; text: string }) {
