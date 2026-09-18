@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { languageLabel, languageScriptNote } from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
 
 type AppRole = "arzt" | "patient" | "spectator";
 
@@ -8,20 +10,6 @@ const TranslateInput = z.object({
   text: z.string().min(1),
   direction: z.enum(["forward", "back"]).optional().default("forward"),
 });
-
-const ROLE_LANGUAGES: Record<
-  Exclude<AppRole, "spectator">,
-  { forward: { code: string; label: string }; back: { code: string; label: string } }
-> = {
-  arzt: {
-    forward: { code: "de", label: "Deutsche" },
-    back: { code: "hi", label: "Hindi (Devanagari)" },
-  },
-  patient: {
-    forward: { code: "hi", label: "Hindi (Devanagari)" },
-    back: { code: "de", label: "Deutsche" },
-  },
-};
 
 const SYSTEM_PROMPT = [
   "Ausschließlich die Übersetzung zurückgeben, ohne Einleitung oder Kommentare.",
@@ -49,7 +37,29 @@ export const translateText = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Rolle 'arzt' oder 'patient' erforderlich");
     }
 
-    const target = ROLE_LANGUAGES[role][data.direction];
+    const { data: langRows, error: langError } = await supabase
+      .from("session_language")
+      .select("role, language_code");
+
+    if (langError) {
+      console.error("[translateText]", langError);
+      throw new Error("Sprachen konnten nicht gelesen werden");
+    }
+
+    const findCode = (r: "arzt" | "patient") =>
+      (langRows?.find((row) => row.role === r)?.language_code ?? null) as LanguageCode | null;
+
+    const myLang = findCode(role);
+    const otherLang = findCode(role === "arzt" ? "patient" : "arzt");
+
+    if (!myLang || !otherLang) {
+      throw new Error("Sprache noch nicht für beide Seiten ausgewählt");
+    }
+
+    const targetCode = data.direction === "forward" ? otherLang : myLang;
+    const targetLabel = languageLabel(targetCode);
+    const scriptNote = languageScriptNote(targetCode);
+
     const apiKey = process.env["OPENAI_API_KEY"];
 
     if (!apiKey) {
@@ -69,7 +79,9 @@ export const translateText = createServerFn({ method: "POST" })
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: `Übersetze ins ${target.label}:\n\n${data.text.trim()}`,
+            content: scriptNote
+              ? `Übersetze ins ${targetLabel} (${scriptNote}):\n\n${data.text.trim()}`
+              : `Übersetze ins ${targetLabel}:\n\n${data.text.trim()}`,
           },
         ],
       }),

@@ -1,13 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { LanguageCode } from "@/lib/languages";
 
 type AppRole = "arzt" | "patient" | "spectator";
-
-/** Deepgram-Sprache pro Rolle: arzt=hi (Hindi), patient=de (Deutsch). */
-const ROLE_LANGUAGE: Record<Exclude<AppRole, "spectator">, string> = {
-  arzt: "hi",
-  patient: "de",
-};
 
 /**
  * Liefert den Deepgram-Browser-Key fuer die direkte WebSocket-Verbindung.
@@ -33,6 +28,21 @@ export const getDeepgramToken = createServerFn({ method: "POST" })
       throw new Error("Forbidden: Rolle 'arzt' oder 'patient' erforderlich");
     }
 
+    const { data: langRow, error: langError } = await supabase
+      .from("session_language")
+      .select("language_code")
+      .eq("role", role)
+      .maybeSingle();
+
+    if (langError) {
+      console.error("[getDeepgramToken]", langError);
+      throw new Error("Sprache konnte nicht gelesen werden");
+    }
+
+    if (!langRow?.language_code) {
+      throw new Error("Bitte zuerst eine Sprache auswählen");
+    }
+
     const browserKey = process.env["DEEPGRAM_BROWSER_KEY"];
     if (!browserKey) {
       throw new Error("Deepgram Browser-Key ist nicht konfiguriert");
@@ -41,7 +51,7 @@ export const getDeepgramToken = createServerFn({ method: "POST" })
     return {
       token: browserKey,
       model: "nova-3" as const,
-      language: ROLE_LANGUAGE[role],
+      language: langRow.language_code as LanguageCode,
       listenUrl: "wss://api.deepgram.com/v1/listen",
     };
   });
