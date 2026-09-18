@@ -482,6 +482,8 @@ function TranscribePage() {
       wsUrl.searchParams.set("encoding", "linear16");
       wsUrl.searchParams.set("sample_rate", "16000");
       wsUrl.searchParams.set("endpointing", "300");
+      wsUrl.searchParams.set("interim_results", "true");
+      wsUrl.searchParams.set("no_delay", "true");
 
       // Authentifizierung gegen Deepgram per Sec-WebSocket-Protocol.
       const ws = new WebSocket(wsUrl.toString(), ["token", token]);
