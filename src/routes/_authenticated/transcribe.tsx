@@ -715,6 +715,30 @@ function TranscribePage() {
     setIsRecording(false);
   }
 
+  async function handleLanguageChange(code: LanguageCode) {
+    setLanguageSaving(true);
+    setError(null);
+    try {
+      await fetchSetMyLanguage({ data: { languageCode: code } });
+      const result = await fetchSessionLanguages({ data: undefined });
+      if (role === "arzt") {
+        setMyLanguageState(result.arzt);
+        setOtherLanguage(result.patient);
+      } else {
+        setMyLanguageState(result.patient);
+        setOtherLanguage(result.arzt);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Sprache konnte nicht gespeichert werden",
+      );
+    } finally {
+      setLanguageSaving(false);
+    }
+  }
+
   return (
     <main className="flex min-h-full flex-col items-center bg-app-background px-4 py-16">
       <Card className="w-full max-w-2xl">
